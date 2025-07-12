@@ -389,3 +389,6 @@ For issues and questions:
 - Create an issue in this repository
 - Check the [MCP documentation](https://modelcontextprotocol.io/docs/tools/debugging)
 - Review Cloudflare Workers [error handling](https://developers.cloudflare.com/workers/observability/errors/)
+
+---
+*Last updated: July 2025*
