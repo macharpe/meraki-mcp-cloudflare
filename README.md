@@ -131,7 +131,7 @@ Deploy the server:
 npx wrangler deploy
 ```
 
-Your server will be available at: `https://meraki-mcp-server.<your-account>.workers.dev`
+Your server will be available at: `https://meraki-mcp-cloudflare.<your-account>.workers.dev`
 
 ## ⚙️ Configuration
 
@@ -148,7 +148,7 @@ Add the following to your Claude Desktop configuration file:
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://meraki-mcp-server.<your-account>.workers.dev/sse"
+        "https://meraki-mcp-cloudflare.<your-account>.workers.dev/sse"
       ]
     }
   }
