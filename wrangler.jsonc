@@ -1,0 +1,19 @@
+{
+  "name": "meraki-mcp-server",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-07",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1"
+  },
+  "build": {
+    "command": "npm run build"
+  },
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  }
+}

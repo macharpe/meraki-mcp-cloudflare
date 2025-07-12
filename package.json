@@ -1,0 +1,46 @@
+{
+  "name": "meraki-mcp-cloudflare",
+  "version": "1.0.0",
+  "description": "Cisco Meraki MCP Server for Cloudflare Workers",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "test": "vitest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "setup:secrets": "echo 'Run: wrangler secret put MERAKI_API_KEY'",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.13.1",
+    "agents": "^0.0.100",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0",
+    "wrangler": "^4.24.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macharpe/meraki-mcp-cloudflare"
+  },
+  "keywords": [
+    "meraki",
+    "cisco",
+    "mcp",
+    "model-context-protocol",
+    "cloudflare-workers",
+    "networking",
+    "api"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
