@@ -106,4 +106,63 @@ export class MerakiAPIService {
   async getSwitchPortStatuses(serial: string, timespan = 300): Promise<SwitchPortStatus[]> {
     return this.makeRequest<SwitchPortStatus[]>(`/devices/${serial}/switch/ports/statuses?timespan=${timespan}`);
   }
+
+  // Device Management Interface
+  async getManagementInterface(serial: string): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/managementInterface`);
+  }
+
+  // Wireless Access Point Methods
+  async getWirelessRadioSettings(serial: string): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/wireless/radio/settings`);
+  }
+
+  async getWirelessStatus(serial: string): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/wireless/status`);
+  }
+
+  async getWirelessLatencyStats(serial: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/wireless/latencyStats?timespan=${timespan}`);
+  }
+
+  // Switch Routing
+  async getSwitchRoutingInterfaces(serial: string): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/switch/routing/interfaces`);
+  }
+
+  async getSwitchStaticRoutes(serial: string): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/switch/routing/staticRoutes`);
+  }
+
+  // Network Traffic and Performance
+  async getNetworkTraffic(networkId: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/networks/${networkId}/traffic?timespan=${timespan}`);
+  }
+
+  async getNetworkEvents(networkId: string, perPage = 10): Promise<any> {
+    return this.makeRequest<any>(`/networks/${networkId}/events?perPage=${perPage}`);
+  }
+
+  // Organization-wide insights
+  async getOrganizationUplinksStatuses(organizationId: string): Promise<any> {
+    return this.makeRequest<any>(`/organizations/${organizationId}/uplinks/statuses`);
+  }
+
+  async getOrganizationApiRequestsOverview(organizationId: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/organizations/${organizationId}/apiRequests/overview?timespan=${timespan}`);
+  }
+
+  // Device Performance
+  async getDevicePerformance(serial: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/devices/${serial}/performance?timespan=${timespan}`);
+  }
+
+  // Security and Monitoring
+  async getNetworkSecurityEvents(networkId: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/networks/${networkId}/security/events?timespan=${timespan}`);
+  }
+
+  async getOrganizationSecurityEvents(organizationId: string, timespan = 86400): Promise<any> {
+    return this.makeRequest<any>(`/organizations/${organizationId}/security/events?timespan=${timespan}`);
+  }
 }

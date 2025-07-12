@@ -18,6 +18,185 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+// Shared tools list
+function getToolsList() {
+  return [
+    {
+      name: "get_organizations",
+      description: "Get all Meraki organizations",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "get_organization",
+      description: "Get details for a specific organization",
+      inputSchema: {
+        type: "object",
+        properties: { organizationId: { type: "string", description: "The organization ID" } },
+        required: ["organizationId"],
+      },
+    },
+    {
+      name: "get_networks",
+      description: "Get all networks in an organization",
+      inputSchema: {
+        type: "object",
+        properties: { organizationId: { type: "string", description: "The organization ID" } },
+        required: ["organizationId"],
+      },
+    },
+    {
+      name: "get_network",
+      description: "Get details for a specific network",
+      inputSchema: {
+        type: "object",
+        properties: { networkId: { type: "string", description: "The network ID" } },
+        required: ["networkId"],
+      },
+    },
+    {
+      name: "get_devices",
+      description: "Get all devices in a network",
+      inputSchema: {
+        type: "object",
+        properties: { networkId: { type: "string", description: "The network ID" } },
+        required: ["networkId"],
+      },
+    },
+    {
+      name: "get_device",
+      description: "Get details for a specific device",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_clients",
+      description: "Get clients connected to a network",
+      inputSchema: {
+        type: "object",
+        properties: {
+          networkId: { type: "string", description: "The network ID" },
+          timespan: { type: "number", description: "Time span in seconds (max 31 days)" },
+        },
+        required: ["networkId"],
+      },
+    },
+    {
+      name: "get_device_statuses",
+      description: "Get device statuses for an organization",
+      inputSchema: {
+        type: "object",
+        properties: { organizationId: { type: "string", description: "The organization ID" } },
+        required: ["organizationId"],
+      },
+    },
+    {
+      name: "get_switch_ports",
+      description: "Get switch ports for a device",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_switch_port_statuses",
+      description: "Get switch port statuses for a device",
+      inputSchema: {
+        type: "object",
+        properties: {
+          serial: { type: "string", description: "The device serial number" },
+          timespan: { type: "number", description: "Time span in seconds (default 300)" },
+        },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_management_interface",
+      description: "Get management interface settings for a device",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_wireless_radio_settings",
+      description: "Get wireless radio settings for an access point",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_wireless_status",
+      description: "Get wireless status of an access point",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_wireless_latency_stats",
+      description: "Get wireless latency statistics for an access point",
+      inputSchema: {
+        type: "object",
+        properties: {
+          serial: { type: "string", description: "The device serial number" },
+          timespan: { type: "number", description: "Time span in seconds (default 86400)" },
+        },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_switch_routing_interfaces",
+      description: "Get routing interfaces for a switch",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_switch_static_routes",
+      description: "Get static routes for a switch",
+      inputSchema: {
+        type: "object",
+        properties: { serial: { type: "string", description: "The device serial number" } },
+        required: ["serial"],
+      },
+    },
+    {
+      name: "get_network_traffic",
+      description: "Get network traffic statistics",
+      inputSchema: {
+        type: "object",
+        properties: {
+          networkId: { type: "string", description: "The network ID" },
+          timespan: { type: "number", description: "Time span in seconds (default 86400)" },
+        },
+        required: ["networkId"],
+      },
+    },
+    {
+      name: "get_network_events",
+      description: "Get recent network events",
+      inputSchema: {
+        type: "object",
+        properties: {
+          networkId: { type: "string", description: "The network ID" },
+          perPage: { type: "number", description: "Number of events per page (default 10)" },
+        },
+        required: ["networkId"],
+      },
+    },
+  ];
+}
+
 // Create and configure MCP server
 function createMCPServer(env: Env) {
   const server = new Server(
@@ -41,150 +220,7 @@ function createMCPServer(env: Env) {
   // List tools handler
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
-      tools: [
-        {
-          name: "get_organizations",
-          description: "Get all Meraki organizations",
-          inputSchema: {
-            type: "object",
-            properties: {},
-          },
-        },
-        {
-          name: "get_organization",
-          description: "Get details for a specific organization",
-          inputSchema: {
-            type: "object",
-            properties: {
-              organizationId: {
-                type: "string",
-                description: "The organization ID",
-              },
-            },
-            required: ["organizationId"],
-          },
-        },
-        {
-          name: "get_networks",
-          description: "Get all networks in an organization",
-          inputSchema: {
-            type: "object",
-            properties: {
-              organizationId: {
-                type: "string",
-                description: "The organization ID",
-              },
-            },
-            required: ["organizationId"],
-          },
-        },
-        {
-          name: "get_network",
-          description: "Get details for a specific network",
-          inputSchema: {
-            type: "object",
-            properties: {
-              networkId: {
-                type: "string",
-                description: "The network ID",
-              },
-            },
-            required: ["networkId"],
-          },
-        },
-        {
-          name: "get_devices",
-          description: "Get all devices in a network",
-          inputSchema: {
-            type: "object",
-            properties: {
-              networkId: {
-                type: "string",
-                description: "The network ID",
-              },
-            },
-            required: ["networkId"],
-          },
-        },
-        {
-          name: "get_device",
-          description: "Get details for a specific device",
-          inputSchema: {
-            type: "object",
-            properties: {
-              serial: {
-                type: "string",
-                description: "The device serial number",
-              },
-            },
-            required: ["serial"],
-          },
-        },
-        {
-          name: "get_clients",
-          description: "Get all clients on a network",
-          inputSchema: {
-            type: "object",
-            properties: {
-              networkId: {
-                type: "string",
-                description: "The network ID",
-              },
-              timespan: {
-                type: "number",
-                description: "Time span in seconds (max 31 days)",
-              },
-            },
-            required: ["networkId"],
-          },
-        },
-        {
-          name: "get_device_statuses",
-          description: "Get device statuses for an organization",
-          inputSchema: {
-            type: "object",
-            properties: {
-              organizationId: {
-                type: "string",
-                description: "The organization ID",
-              },
-            },
-            required: ["organizationId"],
-          },
-        },
-        {
-          name: "get_switch_ports",
-          description: "Get switch ports for a device",
-          inputSchema: {
-            type: "object",
-            properties: {
-              serial: {
-                type: "string",
-                description: "The device serial number",
-              },
-            },
-            required: ["serial"],
-          },
-        },
-        {
-          name: "get_switch_port_statuses",
-          description: "Get switch port statuses for a device",
-          inputSchema: {
-            type: "object",
-            properties: {
-              serial: {
-                type: "string",
-                description: "The device serial number",
-              },
-              timespan: {
-                type: "number",
-                description: "Time span in seconds (default 300)",
-              },
-            },
-            required: ["serial"],
-          },
-        },
-      ],
+      tools: getToolsList(),
     };
   });
 
@@ -293,6 +329,126 @@ function createMCPServer(env: Env) {
           };
         }
 
+        case "get_management_interface": {
+          const { serial } = args as { serial: string };
+          console.log(`[MERAKI-MCP-CALL] get_management_interface called for serial: ${serial}`);
+          const mgmtInterface = await merakiService.getManagementInterface(serial);
+          console.log(`[MERAKI-MCP-CALL] get_management_interface success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(mgmtInterface, null, 2) }],
+          };
+        }
+
+        case "get_wireless_radio_settings": {
+          const { serial } = args as { serial: string };
+          console.log(`[MERAKI-MCP-CALL] get_wireless_radio_settings called for serial: ${serial}`);
+          const radioSettings = await merakiService.getWirelessRadioSettings(serial);
+          console.log(`[MERAKI-MCP-CALL] get_wireless_radio_settings success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(radioSettings, null, 2) }],
+          };
+        }
+
+        case "get_wireless_status": {
+          const { serial } = args as { serial: string };
+          console.log(`[MERAKI-MCP-CALL] get_wireless_status called for serial: ${serial}`);
+          const wirelessStatus = await merakiService.getWirelessStatus(serial);
+          console.log(`[MERAKI-MCP-CALL] get_wireless_status success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(wirelessStatus, null, 2) }],
+          };
+        }
+
+        case "get_wireless_latency_stats": {
+          const { serial, timespan } = args as { serial: string; timespan?: number };
+          console.log(`[MERAKI-MCP-CALL] get_wireless_latency_stats called for serial: ${serial}, timespan: ${timespan}`);
+          const latencyStats = await merakiService.getWirelessLatencyStats(serial, timespan);
+          console.log(`[MERAKI-MCP-CALL] get_wireless_latency_stats success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(latencyStats, null, 2) }],
+          };
+        }
+
+        case "get_switch_routing_interfaces": {
+          const { serial } = args as { serial: string };
+          console.log(`[MERAKI-MCP-CALL] get_switch_routing_interfaces called for serial: ${serial}`);
+          const routingInterfaces = await merakiService.getSwitchRoutingInterfaces(serial);
+          console.log(`[MERAKI-MCP-CALL] get_switch_routing_interfaces success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(routingInterfaces, null, 2) }],
+          };
+        }
+
+        case "get_switch_static_routes": {
+          const { serial } = args as { serial: string };
+          console.log(`[MERAKI-MCP-CALL] get_switch_static_routes called for serial: ${serial}`);
+          const staticRoutes = await merakiService.getSwitchStaticRoutes(serial);
+          console.log(`[MERAKI-MCP-CALL] get_switch_static_routes success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(staticRoutes, null, 2) }],
+          };
+        }
+
+        case "get_network_traffic": {
+          const { networkId, timespan } = args as { networkId: string; timespan?: number };
+          console.log(`[MERAKI-MCP-CALL] get_network_traffic called for network: ${networkId}, timespan: ${timespan}`);
+          const traffic = await merakiService.getNetworkTraffic(networkId, timespan);
+          console.log(`[MERAKI-MCP-CALL] get_network_traffic success for: ${networkId}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(traffic, null, 2) }],
+          };
+        }
+
+        case "get_network_events": {
+          const { networkId, perPage } = args as { networkId: string; perPage?: number };
+          console.log(`[MERAKI-MCP-CALL] get_network_events called for network: ${networkId}, perPage: ${perPage}`);
+          const events = await merakiService.getNetworkEvents(networkId, perPage);
+          console.log(`[MERAKI-MCP-CALL] get_network_events success for: ${networkId}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(events, null, 2) }],
+          };
+        }
+
+        case "get_organization_uplinks_statuses": {
+          const { organizationId } = args as { organizationId: string };
+          console.log(`[MERAKI-MCP-CALL] get_organization_uplinks_statuses called for org: ${organizationId}`);
+          const uplinksStatuses = await merakiService.getOrganizationUplinksStatuses(organizationId);
+          console.log(`[MERAKI-MCP-CALL] get_organization_uplinks_statuses success for: ${organizationId}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(uplinksStatuses, null, 2) }],
+          };
+        }
+
+        case "get_device_performance": {
+          const { serial, timespan } = args as { serial: string; timespan?: number };
+          console.log(`[MERAKI-MCP-CALL] get_device_performance called for serial: ${serial}, timespan: ${timespan}`);
+          const performance = await merakiService.getDevicePerformance(serial, timespan);
+          console.log(`[MERAKI-MCP-CALL] get_device_performance success for: ${serial}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(performance, null, 2) }],
+          };
+        }
+
+        case "get_network_security_events": {
+          const { networkId, timespan } = args as { networkId: string; timespan?: number };
+          console.log(`[MERAKI-MCP-CALL] get_network_security_events called for network: ${networkId}, timespan: ${timespan}`);
+          const securityEvents = await merakiService.getNetworkSecurityEvents(networkId, timespan);
+          console.log(`[MERAKI-MCP-CALL] get_network_security_events success for: ${networkId}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(securityEvents, null, 2) }],
+          };
+        }
+
+        case "get_organization_security_events": {
+          const { organizationId, timespan } = args as { organizationId: string; timespan?: number };
+          console.log(`[MERAKI-MCP-CALL] get_organization_security_events called for org: ${organizationId}, timespan: ${timespan}`);
+          const orgSecurityEvents = await merakiService.getOrganizationSecurityEvents(organizationId, timespan);
+          console.log(`[MERAKI-MCP-CALL] get_organization_security_events success for: ${organizationId}`);
+          return {
+            content: [{ type: "text", text: JSON.stringify(orgSecurityEvents, null, 2) }],
+          };
+        }
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -383,83 +539,11 @@ export default {
               },
             };
           } else if (message.method === 'tools/list') {
-            // Call the tools list handler directly
-            const listToolsRequest = {
-              method: "tools/list" as const,
-              params: message.params || {},
-            };
-            const toolsResult = await new Promise((resolve) => {
-              server.setRequestHandler(ListToolsRequestSchema, async () => {
-                return {
-                  tools: [
-                    {
-                      name: "get_organizations",
-                      description: "Get all Meraki organizations",
-                      inputSchema: { type: "object", properties: {} },
-                    },
-                    // Add other tools here if needed for the response
-                  ],
-                };
-              });
-              resolve({ tools: [] }); // Simplified for now
-            });
-            
             response = {
               jsonrpc: "2.0",
               id: message.id,
               result: {
-                tools: [
-                  {
-                    name: "get_organizations",
-                    description: "Get all Meraki organizations",
-                    inputSchema: { type: "object", properties: {} },
-                  },
-                  {
-                    name: "get_organization",
-                    description: "Get details for a specific organization",
-                    inputSchema: {
-                      type: "object",
-                      properties: { organizationId: { type: "string", description: "The organization ID" } },
-                      required: ["organizationId"],
-                    },
-                  },
-                  {
-                    name: "get_networks",
-                    description: "Get all networks in an organization",
-                    inputSchema: {
-                      type: "object",
-                      properties: { organizationId: { type: "string", description: "The organization ID" } },
-                      required: ["organizationId"],
-                    },
-                  },
-                  {
-                    name: "get_network",
-                    description: "Get details for a specific network",
-                    inputSchema: {
-                      type: "object",
-                      properties: { networkId: { type: "string", description: "The network ID" } },
-                      required: ["networkId"],
-                    },
-                  },
-                  {
-                    name: "get_devices",
-                    description: "Get all devices in a network",
-                    inputSchema: {
-                      type: "object",
-                      properties: { networkId: { type: "string", description: "The network ID" } },
-                      required: ["networkId"],
-                    },
-                  },
-                  {
-                    name: "get_device",
-                    description: "Get details for a specific device",
-                    inputSchema: {
-                      type: "object",
-                      properties: { serial: { type: "string", description: "The device serial number" } },
-                      required: ["serial"],
-                    },
-                  },
-                ],
+                tools: getToolsList(),
               },
             };
           } else if (message.method === 'tools/call') {
@@ -489,6 +573,42 @@ export default {
                   break;
                 case "get_device":
                   result = await merakiService.getDevice(args.serial);
+                  break;
+                case "get_clients":
+                  result = await merakiService.getClients(args.networkId, args.timespan);
+                  break;
+                case "get_device_statuses":
+                  result = await merakiService.getDeviceStatuses(args.organizationId);
+                  break;
+                case "get_switch_ports":
+                  result = await merakiService.getSwitchPorts(args.serial);
+                  break;
+                case "get_switch_port_statuses":
+                  result = await merakiService.getSwitchPortStatuses(args.serial, args.timespan);
+                  break;
+                case "get_management_interface":
+                  result = await merakiService.getManagementInterface(args.serial);
+                  break;
+                case "get_wireless_radio_settings":
+                  result = await merakiService.getWirelessRadioSettings(args.serial);
+                  break;
+                case "get_wireless_status":
+                  result = await merakiService.getWirelessStatus(args.serial);
+                  break;
+                case "get_wireless_latency_stats":
+                  result = await merakiService.getWirelessLatencyStats(args.serial, args.timespan);
+                  break;
+                case "get_switch_routing_interfaces":
+                  result = await merakiService.getSwitchRoutingInterfaces(args.serial);
+                  break;
+                case "get_switch_static_routes":
+                  result = await merakiService.getSwitchStaticRoutes(args.serial);
+                  break;
+                case "get_network_traffic":
+                  result = await merakiService.getNetworkTraffic(args.networkId, args.timespan);
+                  break;
+                case "get_network_events":
+                  result = await merakiService.getNetworkEvents(args.networkId, args.perPage);
                   break;
                 default:
                   throw new Error(`Unknown tool: ${toolName}`);
@@ -545,7 +665,7 @@ export default {
         service: "meraki-mcp-server",
         hasApiKey: !!env.MERAKI_API_KEY,
         version: "1.0.0",
-        tools: 10,
+        tools: 18,
         endpoints: ["/sse", "/health", "/"]
       }), {
         headers: { 'Content-Type': 'application/json' },
