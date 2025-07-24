@@ -191,12 +191,46 @@ Add the following to your Claude Desktop configuration file:
 
 **Replace `<your-account>` with your actual Cloudflare account subdomain.**
 
+### 🔐 Authentication (Optional)
+
+To secure your MCP server with authentication:
+
+1. **Set up AUTH_TOKEN secret**:
+```bash
+wrangler secret put AUTH_TOKEN
+# Enter your desired authentication token when prompted
+```
+
+2. **Update Claude Desktop configuration** to include the auth header:
+```json
+{
+  "mcpServers": {
+    "meraki": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://meraki-mcp-cloudflare.<your-account>.workers.dev/sse",
+        "--header", "Authorization=Bearer your-auth-token-here"
+      ]
+    }
+  }
+}
+```
+
+3. **Verify authentication** by checking the health endpoint:
+```bash
+curl https://meraki-mcp-cloudflare.<your-account>.workers.dev/health
+```
+
+The response will show `"authEnabled": true` when authentication is configured.
+
 ### 🌍 Environment Variables
 
 The server uses these environment variables:
 
 - **`MERAKI_API_KEY`** (required): Your Cisco Meraki API key
 - **`MERAKI_BASE_URL`** (optional): Base URL for Meraki API (defaults to `https://api.meraki.com/api/v1`)
+- **`AUTH_TOKEN`** (optional): Authentication token for securing the MCP server
 
 ## 💡 Usage Examples
 
