@@ -8,6 +8,7 @@ import { MerakiAPIService } from "./services/merakiapi";
 interface Env {
   MERAKI_API_KEY: string;
   MERAKI_BASE_URL?: string;
+  AUTH_TOKEN?: string;
 }
 
 // Helper function to safely get error message
@@ -471,6 +472,18 @@ export default {
       if (!env.MERAKI_API_KEY) {
         return new Response('MERAKI_API_KEY not configured', { status: 500 });
       }
+
+      // Authentication check
+      if (env.AUTH_TOKEN) {
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return new Response('Authorization header required', { status: 401 });
+        }
+        const token = authHeader.slice(7); // Remove 'Bearer ' prefix
+        if (token !== env.AUTH_TOKEN) {
+          return new Response('Invalid token', { status: 401 });
+        }
+      }
       
       try {
         // Create MCP server instance
@@ -664,6 +677,7 @@ export default {
         timestamp: new Date().toISOString(),
         service: "meraki-mcp-server",
         hasApiKey: !!env.MERAKI_API_KEY,
+        authEnabled: !!env.AUTH_TOKEN,
         version: "1.0.0",
         tools: 18,
         endpoints: ["/sse", "/health", "/"]
