@@ -7,8 +7,7 @@ import type {
   DeviceStatus,
   Client,
   SwitchPort,
-  SwitchPortStatus,
-  UpdateSwitchPortRequest 
+  SwitchPortStatus
 } from "../types/meraki";
 
 export class MerakiAPIService {
@@ -96,13 +95,6 @@ export class MerakiAPIService {
     return this.makeRequest<SwitchPort[]>(`/devices/${serial}/switch/ports`);
   }
 
-  async updateSwitchPort(serial: string, portId: string, config: UpdateSwitchPortRequest): Promise<SwitchPort> {
-    return this.makeRequest<SwitchPort>(`/devices/${serial}/switch/ports/${portId}`, {
-      method: "PUT",
-      body: JSON.stringify(config),
-    });
-  }
-
   async getSwitchPortStatuses(serial: string, timespan = 300): Promise<SwitchPortStatus[]> {
     return this.makeRequest<SwitchPortStatus[]>(`/devices/${serial}/switch/ports/statuses?timespan=${timespan}`);
   }
@@ -146,10 +138,6 @@ export class MerakiAPIService {
   // Organization-wide insights
   async getOrganizationUplinksStatuses(organizationId: string): Promise<any> {
     return this.makeRequest<any>(`/organizations/${organizationId}/uplinks/statuses`);
-  }
-
-  async getOrganizationApiRequestsOverview(organizationId: string, timespan = 86400): Promise<any> {
-    return this.makeRequest<any>(`/organizations/${organizationId}/apiRequests/overview?timespan=${timespan}`);
   }
 
   // Device Performance

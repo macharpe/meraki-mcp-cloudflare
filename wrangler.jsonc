@@ -1,7 +1,7 @@
 {
   "name": "meraki-mcp-cloudflare",
   "main": "src/index.ts",
-  "compatibility_date": "2025-04-07",
+  "compatibility_date": "2025-08-04",
   "compatibility_flags": [
     "nodejs_compat"
   ],

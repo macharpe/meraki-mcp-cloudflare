@@ -185,33 +185,3 @@ export interface SwitchPortStatus {
   };
 }
 
-export interface UpdateSwitchPortRequest {
-  name?: string;
-  enabled?: boolean;
-  type?: "access" | "trunk";
-  vlan?: number;
-  voiceVlan?: number;
-  allowedVlans?: string;
-  poeEnabled?: boolean;
-  isolationEnabled?: boolean;
-  rstpEnabled?: boolean;
-  stpGuard?: "disabled" | "root guard" | "bpdu guard" | "loop guard";
-  linkNegotiation?: string;
-  portScheduleId?: string;
-  udld?: string;
-  accessPolicyType?: string;
-  accessPolicyNumber?: number;
-  macAllowList?: string[];
-  stickyMacAllowList?: string[];
-  stickyMacAllowListLimit?: number;
-  stormControlEnabled?: boolean;
-  adaptivePolicyGroupId?: string;
-  peerSgtCapable?: boolean;
-  flexibleStackingEnabled?: boolean;
-  daiTrusted?: boolean;
-  profile?: {
-    enabled: boolean;
-    id?: string;
-    iname?: string;
-  };
-}
