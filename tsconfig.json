@@ -22,13 +22,7 @@
 		"exactOptionalPropertyTypes": false,
 		"types": [
 			"@cloudflare/workers-types"
-		],
-		"baseUrl": ".",
-		"paths": {
-			"@/*": [
-				"src/*"
-			]
-		}
+		]
 	},
 	"include": [
 		"src/**/*"

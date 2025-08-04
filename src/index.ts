@@ -410,46 +410,6 @@ function createMCPServer(env: Env) {
           };
         }
 
-        case "get_organization_uplinks_statuses": {
-          const { organizationId } = args as { organizationId: string };
-          console.log(`[MERAKI-MCP-CALL] get_organization_uplinks_statuses called for org: ${organizationId}`);
-          const uplinksStatuses = await merakiService.getOrganizationUplinksStatuses(organizationId);
-          console.log(`[MERAKI-MCP-CALL] get_organization_uplinks_statuses success for: ${organizationId}`);
-          return {
-            content: [{ type: "text", text: JSON.stringify(uplinksStatuses, null, 2) }],
-          };
-        }
-
-        case "get_device_performance": {
-          const { serial, timespan } = args as { serial: string; timespan?: number };
-          console.log(`[MERAKI-MCP-CALL] get_device_performance called for serial: ${serial}, timespan: ${timespan}`);
-          const performance = await merakiService.getDevicePerformance(serial, timespan);
-          console.log(`[MERAKI-MCP-CALL] get_device_performance success for: ${serial}`);
-          return {
-            content: [{ type: "text", text: JSON.stringify(performance, null, 2) }],
-          };
-        }
-
-        case "get_network_security_events": {
-          const { networkId, timespan } = args as { networkId: string; timespan?: number };
-          console.log(`[MERAKI-MCP-CALL] get_network_security_events called for network: ${networkId}, timespan: ${timespan}`);
-          const securityEvents = await merakiService.getNetworkSecurityEvents(networkId, timespan);
-          console.log(`[MERAKI-MCP-CALL] get_network_security_events success for: ${networkId}`);
-          return {
-            content: [{ type: "text", text: JSON.stringify(securityEvents, null, 2) }],
-          };
-        }
-
-        case "get_organization_security_events": {
-          const { organizationId, timespan } = args as { organizationId: string; timespan?: number };
-          console.log(`[MERAKI-MCP-CALL] get_organization_security_events called for org: ${organizationId}, timespan: ${timespan}`);
-          const orgSecurityEvents = await merakiService.getOrganizationSecurityEvents(organizationId, timespan);
-          console.log(`[MERAKI-MCP-CALL] get_organization_security_events success for: ${organizationId}`);
-          return {
-            content: [{ type: "text", text: JSON.stringify(orgSecurityEvents, null, 2) }],
-          };
-        }
-
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -679,7 +639,7 @@ export default {
         hasApiKey: !!env.MERAKI_API_KEY,
         authEnabled: !!env.AUTH_TOKEN,
         version: "1.0.0",
-        tools: 18,
+        tools: getToolsList().length,
         endpoints: ["/sse", "/health", "/"]
       }), {
         headers: { 'Content-Type': 'application/json' },
