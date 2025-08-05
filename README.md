@@ -28,7 +28,6 @@ The server provides **18 comprehensive Meraki management tools**:
 - **`get_devices`** - List all devices within a network
 - **`get_device`** - Get detailed information about a specific device
 - **`get_device_statuses`** - Get device statuses for an organization
-- **`get_device_performance`** - Get performance statistics for a device
 - **`get_management_interface`** - Get management interface settings for a device
 
 #### 🌐 Network Operations
@@ -399,7 +398,7 @@ src/
 ### API Coverage
 - **Organizations**: 2 methods (list, get details)
 - **Networks**: 4 methods (list, details, traffic, events)  
-- **Devices**: 5 methods (list, details, status, performance, management)
+- **Devices**: 4 methods (list, details, status, management)
 - **Wireless**: 3 methods (radio settings, status, latency stats)
 - **Switch**: 4 methods (ports, port status, routing, static routes)
 - **Clients**: 1 method (network clients)
