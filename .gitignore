@@ -68,5 +68,8 @@ coverage/
 # TypeScript cache
 *.tsbuildinfo
 
+# Auto-generated types
+worker-configuration.d.ts
+
 # CLAUDE.md
 CLAUDE.md
