@@ -377,7 +377,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ### Project Metrics
 ```
-📁 Total Files: 15
+📁 Total Files: 20
 📄 Source Files: 4 TypeScript files
 🛠️ Available Tools: 18 Meraki API methods
 🔧 API Service Methods: 20+ methods
@@ -388,12 +388,12 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ### File Breakdown
 ```
 src/
-├── index.ts              # 726 lines - Main MCP server & HTTP handlers
+├── index.ts              # 542 lines - Main MCP server & HTTP handlers
 ├── services/
-│   └── merakiapi.ts      # 168 lines - Meraki API service layer  
+│   └── merakiapi.ts      # 190 lines - Meraki API service layer  
 ├── types/
-│   └── meraki.ts         # Type definitions for Meraki objects
-└── errors.ts             # Custom error classes
+│   └── meraki.ts         # 308 lines - Type definitions for Meraki objects
+└── errors.ts             # 19 lines - Custom error classes
 ```
 
 ### API Coverage
