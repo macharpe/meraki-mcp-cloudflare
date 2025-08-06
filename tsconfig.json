@@ -18,8 +18,10 @@
 		"resolveJsonModule": true,
 		"isolatedModules": true,
 		"noEmit": false,
-		"noUncheckedIndexedAccess": false,
-		"exactOptionalPropertyTypes": false,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
 		"types": [
 			"@cloudflare/workers-types"
 		]
