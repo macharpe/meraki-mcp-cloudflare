@@ -381,10 +381,10 @@ export default {
 						id?: string | number;
 						params?: { name?: string; arguments?: Record<string, unknown> };
 					};
-					
+
 					try {
 						message = (await request.json()) as typeof message;
-					} catch (error) {
+					} catch (_error) {
 						return new Response(
 							JSON.stringify({
 								jsonrpc: "2.0",
