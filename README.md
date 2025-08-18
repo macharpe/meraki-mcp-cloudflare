@@ -9,7 +9,9 @@
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/macharpe/meraki-mcp-cloudflare)
 
-A Model Context Protocol (MCP) server that provides AI assistants with direct access to Cisco Meraki network management capabilities. This server runs on Cloudflare Workers and enables seamless integration between AI tools like Claude Desktop and your Meraki infrastructure.
+A Model Context Protocol (MCP) server that provides AI assistants with direct access to Cisco Meraki network management capabilities. This server runs on Cloudflare Workers with enterprise-grade security using Cloudflare Access Zero Trust authentication.
+
+> **Prerequisites**: This implementation requires a domain managed by Cloudflare for custom domain setup and Cloudflare Access authentication.
 
 > **Inspiration**: This implementation was inspired by [Censini/mcp-server-meraki](https://github.com/Censini/mcp-server-meraki) - credits to the original work for additional API method ideas.
 
@@ -50,10 +52,11 @@ The server provides **18 comprehensive Meraki management tools**:
 ### 🎯 Key Benefits
 
 - 🚀 **Serverless**: Runs on Cloudflare Workers with automatic scaling
-- 🔒 **Secure**: API key management through Cloudflare Workers secrets
-- 🌐 **Remote Access**: Connect from any MCP client using SSE transport
+- 🔒 **Enterprise Security**: Cloudflare Access Zero Trust authentication
+- 🌐 **Custom Domain**: Professional branded domain with SSL
 - 📱 **Real-time**: Live access to your Meraki dashboard data
 - 💰 **Cost-effective**: Pay-per-use with Cloudflare Workers free tier
+- 🛡️ **Zero Trust**: Service token authentication for machine-to-machine access
 
 ## 🏗️ Architecture
 
@@ -63,7 +66,11 @@ The server provides **18 comprehensive Meraki management tools**:
 │   Desktop       │◄──►│  (Cloudflare     │◄──►│  Dashboard      │
 │                 │    │   Workers)       │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-     mcp-remote              SSE/HTTP              HTTPS/REST
+    Service Tokens       Custom Domain          HTTPS/REST
+         ▲                      ▲
+         └──────────────────────┘
+           Cloudflare Access
+           Zero Trust Security
 ```
 
 ### 📁 Project Structure
@@ -86,11 +93,13 @@ meraki-mcp-cloudflare/
 
 Before deploying the server, ensure you have:
 
-1. **Cloudflare Account**: Free account at [cloudflare.com](https://cloudflare.com)
-2. **Cisco Meraki Account**: With API access enabled
-3. **Meraki API Key**: Generated from your Meraki Dashboard
-4. **Node.js**: Version 18 or higher
-5. **Git**: For cloning the repository
+1. **🌐 Cloudflare Account**: Free account at [cloudflare.com](https://cloudflare.com)
+2. **🌍 Domain in Cloudflare**: Your domain must be managed by Cloudflare for custom domain and Access features
+3. **🔑 Cisco Meraki Account**: With API access enabled
+4. **🎫 Meraki API Key**: Generated from your Meraki Dashboard
+5. **🛡️ Cloudflare Access Service Tokens**: Machine-to-machine authentication tokens (more secure than user-based authentication)
+6. **💻 Node.js**: Version 18 or higher
+7. **📦 Git**: For cloning the repository
 
 ### 🔑 Getting Your Meraki API Key
 
@@ -98,6 +107,18 @@ Before deploying the server, ensure you have:
 2. Navigate to **Organization > Settings > Dashboard API access**
 3. Enable API access if not already enabled
 4. Generate a new API key and copy it securely
+
+### 🛡️ Getting Cloudflare Access Service Tokens
+
+Service tokens provide secure machine-to-machine authentication without requiring user interaction. They are more secure than traditional authentication methods because:
+
+- **Automated Authentication**: No human intervention required for API access
+- **Scoped Access**: Tokens can be restricted to specific applications and resources
+- **Audit Trail**: All service token usage is logged and traceable
+- **Revocable**: Tokens can be instantly revoked without affecting user access
+- **No Password Risk**: No risk of password-based attacks or credential stuffing
+
+**To generate service tokens, you'll need to complete the Cloudflare Access setup in the deployment section below.**
 
 ## 🚀 Installation & Deployment
 
@@ -122,19 +143,42 @@ Create a `.dev.vars` file for local development:
 echo "MERAKI_API_KEY=your_meraki_api_key_here" > .dev.vars
 ```
 
-### 4. Local Development
+### 4. Configure Custom Domain
 
-Test the server locally:
+Update `wrangler.jsonc` with your domain:
 
-```bash
-npm run dev
-```
-
-The server will start at `http://localhost:8787`
-
-Test the health endpoint:
-```bash
-curl http://localhost:8787/health
+```jsonc
+{
+  "name": "meraki-mcp-cloudflare",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  
+  "vars": {
+    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1",
+    "CF_ACCESS_TEAM_DOMAIN": "yourcompany.cloudflareaccess.com"
+  },
+  
+  "routes": [
+    {
+      "pattern": "meraki-mcp.yourdomain.com",
+      "custom_domain": true
+    }
+  ],
+  
+  "workers_dev": false,
+  "preview_urls": false,
+  
+  "build": {
+    "command": "npm run build"
+  },
+  
+  "observability": {
+    "logs": {
+      "enabled": true
+    }
+  }
+}
 ```
 
 ### 5. Deploy to Cloudflare Workers
@@ -155,25 +199,77 @@ Deploy the server:
 npx wrangler deploy
 ```
 
-Your server will be available at: `https://meraki-mcp-cloudflare.<your-account>.workers.dev`
+Your server will be available at: `https://meraki-mcp.yourdomain.com`
 
-The health endpoint will show:
-```json
-{
-  "status": "healthy",
-  "hasApiKey": true,
-  "tools": 18,
-  "endpoints": ["/sse", "/health", "/"]
-}
+## 🔒 Cloudflare Access Security Setup
+
+### 1. Enable Cloudflare Access
+
+1. Navigate to **Zero Trust** > **Access** > **Applications** in your Cloudflare dashboard
+2. Click **Add an application** > **Self-hosted**
+
+### 2. Configure Application
+
+**Application Settings**:
+- **Application name**: `Meraki MCP Server`
+- **Subdomain**: `meraki-mcp` 
+- **Domain**: `yourdomain.com`
+- **Path**: `/` (protect entire application)
+
+**Application Type**: Self-hosted
+
+### 3. Create Access Policy
+
+1. **Policy name**: `Service Token Access`
+2. **Action**: `Service Auth`
+3. **Rule type**: `Service Token`
+4. Save the application
+
+### 4. Generate Service Token
+
+Service tokens provide secure machine-to-machine authentication, eliminating the need for user credentials and providing better security through:
+
+- **No Interactive Login**: Tokens work without browser-based authentication
+- **Application-Specific**: Each token is tied to specific applications  
+- **Automatic Validation**: Cloudflare validates tokens at the network edge
+- **Centralized Management**: Tokens can be managed and revoked from the dashboard
+
+1. Go to **Access** > **Service Auth** > **Service Tokens**
+2. Click **Create Service Token**
+3. Configure token:
+   - **Name**: `Meraki MCP Client`
+   - **Duration**: Choose appropriate lifetime (e.g., 1 year)
+4. **Important**: Copy the generated credentials:
+   - **Client ID** (e.g., `00abc123def456789.access`)
+   - **Client Secret** (e.g., `98d57c3451bff...`)
+
+### 5. Set Application Audience Token (Required for Enhanced Security)
+
+The Application Audience (AUD) token provides an additional layer of security by ensuring that service tokens can only be used with the specific Cloudflare Access application they were intended for. This prevents:
+
+- **Token Reuse**: Prevents tokens from being used with other applications
+- **Application Isolation**: Ensures strict boundaries between different services
+- **Enhanced Validation**: Double-verification of both service token and application identity
+- **Defense in Depth**: Multiple layers of authentication validation
+
+The AUD token is a unique identifier for your Cloudflare Access application and can be found in your application settings.
+
+Set the AUD token as a Worker secret:
+```bash
+npx wrangler secret put CF_ACCESS_AUD
+# Enter the AUD value from your Cloudflare Access app (found in app settings)
+# Example: 8078f4c875b3320cae6f27bd67d8a7b9d428e3f9aaf3e6b3fc0ec2bfd1ec798b
 ```
 
-## ⚙️ Configuration
+## ⚙️ Claude Desktop Configuration
 
-### 💻 Claude Desktop Integration
+### 💻 Setup Instructions
 
-Add the following to your Claude Desktop configuration file:
+1. **Locate your Claude Desktop config file**:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-**Location**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+2. **Add the Meraki MCP server configuration**:
 
 ```json
 {
@@ -182,55 +278,55 @@ Add the following to your Claude Desktop configuration file:
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://meraki-mcp-cloudflare.<your-account>.workers.dev/sse"
+        "https://meraki-mcp.yourdomain.com/sse",
+        "--header",
+        "CF-Access-Client-Id: your-client-id",
+        "--header",
+        "CF-Access-Client-Secret: your-client-secret"
       ]
     }
   }
 }
 ```
 
-**Replace `<your-account>` with your actual Cloudflare account subdomain.**
+3. **Replace with your actual values**:
+   - `yourdomain.com` → Your actual domain
+   - `your-client-id` → Your actual Client ID
+   - `your-client-secret` → Your actual Client Secret
 
-### 🔐 Authentication (Optional)
+4. **Restart Claude Desktop** completely (quit and relaunch)
 
-To secure your MCP server with authentication:
+### ✅ Verify Configuration
 
-1. **Set up AUTH_TOKEN secret**:
-```bash
-wrangler secret put AUTH_TOKEN
-# Enter your desired authentication token when prompted
-```
+Check that the server is properly connected:
 
-2. **Update Claude Desktop configuration** to include the auth header:
-```json
-{
-  "mcpServers": {
-    "meraki": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://meraki-mcp-cloudflare.<your-account>.workers.dev/sse",
-        "--header", "Authorization=Bearer your-auth-token-here"
-      ]
-    }
-  }
-}
-```
+1. Open Claude Desktop
+2. Start a new conversation
+3. Try: "List my Meraki organizations"
 
-3. **Verify authentication** by checking the health endpoint:
-```bash
-curl https://meraki-mcp-cloudflare.<your-account>.workers.dev/health
-```
+You should see a successful response with your organization data.
 
-The response will show `"authEnabled": true` when authentication is configured.
-
-### 🌍 Environment Variables
+## 🌍 Environment Variables
 
 The server uses these environment variables:
 
-- **`MERAKI_API_KEY`** (required): Your Cisco Meraki API key
-- **`MERAKI_BASE_URL`** (optional): Base URL for Meraki API (defaults to `https://api.meraki.com/api/v1`)
-- **`AUTH_TOKEN`** (optional): Authentication token for securing the MCP server
+### Required
+- **`MERAKI_API_KEY`** - Your Cisco Meraki API key (stored as Worker secret)
+
+### Optional
+- **`MERAKI_BASE_URL`** - Base URL for Meraki API (defaults to `https://api.meraki.com/api/v1`)
+- **`CF_ACCESS_AUD`** - Application Audience token for additional security validation
+- **`CF_ACCESS_TEAM_DOMAIN`** - Your Cloudflare team domain (e.g., `yourcompany.cloudflareaccess.com`)
+
+### Setting Secrets
+
+```bash
+# Required
+npx wrangler secret put MERAKI_API_KEY
+
+# Optional (for enhanced security)
+npx wrangler secret put CF_ACCESS_AUD
+```
 
 ## 💡 Usage Examples
 
@@ -279,9 +375,26 @@ Once connected to Claude Desktop, you can use natural language to interact with 
 The server exposes these HTTP endpoints:
 
 - **`GET /sse`** - Server-Sent Events endpoint for MCP communication
-- **`POST /sse`** - HTTP endpoint for MCP messages
-- **`GET /health`** - Health check endpoint
+- **`POST /sse`** - HTTP endpoint for MCP messages  
+- **`GET /health`** - Health check endpoint with authentication status
 - **`OPTIONS /*`** - CORS preflight handler
+
+### Health Check Response
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-08-18T12:00:00.000Z",
+  "service": "meraki-mcp-server",
+  "hasApiKey": true,
+  "authEnabled": true,
+  "cfAccessAudEnabled": true,
+  "cfAccessTeamDomainEnabled": true,
+  "version": "1.0.0",
+  "tools": 18,
+  "endpoints": ["/sse", "/health", "/"]
+}
+```
 
 ## 🛠️ Development
 
@@ -289,10 +402,25 @@ The server exposes these HTTP endpoints:
 
 ```bash
 npm run dev          # Start local development server
-npm run build        # Build TypeScript to JavaScript
+npm run build        # Build TypeScript to JavaScript  
 npm run deploy       # Deploy to Cloudflare Workers
 npm run lint         # Run ESLint
 npm run format       # Format code with Prettier
+```
+
+### 🧪 Local Development
+
+```bash
+# Start local server
+npm run dev
+
+# Test health endpoint
+curl http://localhost:8787/health
+
+# Test with service tokens (if configured)
+curl -H "CF-Access-Client-Id: your-client-id" \
+     -H "CF-Access-Client-Secret: your-client-secret" \
+     http://localhost:8787/health
 ```
 
 ### ➕ Adding New Tools
@@ -325,12 +453,25 @@ case "get_clients":
   return { content: [{ type: "text", text: JSON.stringify(clients, null, 2) }] };
 ```
 
-## 🔒 Security Considerations
+## 🔒 Security Features
 
-- API keys are stored as Cloudflare Workers secrets (encrypted at rest)
-- No authentication required for the MCP server (suitable for personal use)
-- All communication uses HTTPS
-- CORS headers allow cross-origin requests
+### 🛡️ Zero Trust Architecture
+- **Cloudflare Access**: Enterprise-grade authentication at the edge
+- **Service Tokens**: Machine-to-machine authentication without user interaction
+- **Custom Domain**: Professional branded endpoint with automatic SSL
+- **Edge Validation**: All authentication happens at Cloudflare's edge before reaching your Worker
+
+### 🔐 Data Protection
+- **API Keys**: Stored as encrypted Cloudflare Worker secrets
+- **JWT Validation**: Cloudflare Access provides signed JWT tokens
+- **HTTPS Only**: All communication encrypted in transit
+- **No Data Storage**: Server is stateless with no data persistence
+
+### 🚨 Access Control
+- **AUD Token**: Application-specific audience validation
+- **Team Domain**: Organization-level access control
+- **Rate Limiting**: Built-in DDoS protection via Cloudflare
+- **Geographic Controls**: Optional geo-blocking capabilities
 
 ## 🐛 Troubleshooting
 
@@ -339,14 +480,20 @@ case "get_clients":
 **"MERAKI_API_KEY not configured"**
 - Ensure you've set the secret: `npx wrangler secret put MERAKI_API_KEY`
 
+**"403 Forbidden" from custom domain**  
+- Check Cloudflare Access configuration
+- Verify service tokens are correct
+- Ensure domain is properly configured in Cloudflare
+
 **"Server disconnected" in Claude Desktop**
 - Check your Claude Desktop config file syntax
-- Verify the server URL is correct
+- Verify service tokens are correctly formatted
 - Restart Claude Desktop after config changes
 
-**"Rate limit exceeded"**
-- Meraki API has rate limits; reduce request frequency
-- Check your API key permissions
+**"Unauthorized - Valid service token required"**
+- Verify service tokens in Claude Desktop config
+- Check that Cloudflare Access application is properly configured
+- Ensure the custom domain is working
 
 ### 🔍 Debugging
 
@@ -357,7 +504,18 @@ npx wrangler tail
 
 View Claude Desktop MCP logs:
 ```bash
+# macOS
 tail -f ~/Library/Logs/Claude/mcp-server-meraki.log
+
+# Windows
+Get-Content $env:APPDATA\Claude\logs\mcp-server-meraki.log -Wait
+```
+
+Test authentication manually:
+```bash
+curl -H "CF-Access-Client-Id: your-client-id" \
+     -H "CF-Access-Client-Secret: your-client-secret" \
+     https://meraki-mcp.yourdomain.com/health
 ```
 
 ## 🤝 Contributing
@@ -388,7 +546,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ### File Breakdown
 ```
 src/
-├── index.ts              # 542 lines - Main MCP server & HTTP handlers
+├── index.ts              # 575 lines - Main MCP server & HTTP handlers
 ├── services/
 │   └── merakiapi.ts      # 190 lines - Meraki API service layer  
 ├── types/
@@ -406,7 +564,7 @@ src/
 
 ### Performance
 - **Cold Start**: ~30ms on Cloudflare Workers
-- **Response Time**: <100ms for most API calls
+- **Response Time**: <100ms for most API calls  
 - **Rate Limits**: Respects Meraki API limits (5 requests/second)
 - **Caching**: Browser/CDN caching for static responses
 
@@ -415,6 +573,7 @@ src/
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
 - [Cisco Meraki API Documentation](https://developer.cisco.com/meraki/api/)
 - [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
+- [Cloudflare Access Documentation](https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/)
 - [Claude Desktop MCP Setup](https://modelcontextprotocol.io/quickstart/user)
 
 ## 💬 Support
@@ -423,6 +582,7 @@ For issues and questions:
 - Create an issue in this repository
 - Check the [MCP documentation](https://modelcontextprotocol.io/docs/tools/debugging)
 - Review Cloudflare Workers [error handling](https://developers.cloudflare.com/workers/observability/errors/)
+- Consult [Cloudflare Access troubleshooting](https://developers.cloudflare.com/cloudflare-one/identity/service-tokens/#troubleshooting)
 
 ---
-*Last updated: July 2025*
+*Last updated: August 2025*
