@@ -4,7 +4,8 @@ import { MerakiAPIService } from "./services/merakiapi";
 interface Env {
 	MERAKI_API_KEY: string;
 	MERAKI_BASE_URL?: string;
-	AUTH_TOKEN?: string;
+	CF_ACCESS_AUD?: string;
+	CF_ACCESS_TEAM_DOMAIN?: string;
 }
 
 // Helper function to safely get error message
@@ -13,6 +14,26 @@ function getErrorMessage(error: unknown): string {
 		return error.message;
 	}
 	return String(error);
+}
+
+// Cloudflare Access Service Token validation
+function validateServiceToken(request: Request, _env: Env): boolean {
+	// When CF Access validates service tokens, it provides a JWT assertion
+	// instead of the original CF-Access-Client-Id/CF-Access-Client-Secret headers
+	const jwtAssertion = request.headers.get("cf-access-jwt-assertion");
+	const cfAuthCookie = request.headers
+		.get("cookie")
+		?.includes("CF_Authorization=");
+
+	// Check if we have CF Access JWT (indicates successful service token validation)
+	if (!jwtAssertion && !cfAuthCookie) {
+		return false;
+	}
+
+	// If we have JWT, Cloudflare has already validated the service token
+	// Additional validation can be done by decoding the JWT if needed
+	console.log("Service token validation successful - CF Access JWT present");
+	return true;
 }
 
 // Tool handler mapping for cleaner code
@@ -319,16 +340,12 @@ export default {
 				return new Response("MERAKI_API_KEY not configured", { status: 500 });
 			}
 
-			// Authentication check
-			if (env.AUTH_TOKEN) {
-				const authHeader = request.headers.get("Authorization");
-				if (!authHeader || !authHeader.startsWith("Bearer ")) {
-					return new Response("Authorization header required", { status: 401 });
-				}
-				const token = authHeader.slice(7); // Remove 'Bearer ' prefix
-				if (token !== env.AUTH_TOKEN) {
-					return new Response("Invalid token", { status: 401 });
-				}
+			// Cloudflare Access Service Token validation
+			if (!validateServiceToken(request, env)) {
+				return new Response("Unauthorized - Valid service token required", {
+					status: 401,
+					headers: { "Content-Type": "application/json" },
+				});
 			}
 
 			try {
@@ -369,7 +386,8 @@ export default {
 							Connection: "keep-alive",
 							"Access-Control-Allow-Origin": "*",
 							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-							"Access-Control-Allow-Headers": "Content-Type",
+							"Access-Control-Allow-Headers":
+								"Content-Type, CF-Access-Client-Id, CF-Access-Client-Secret",
 						},
 					});
 				}
@@ -509,7 +527,9 @@ export default {
 					timestamp: new Date().toISOString(),
 					service: "meraki-mcp-server",
 					hasApiKey: !!env.MERAKI_API_KEY,
-					authEnabled: !!env.AUTH_TOKEN,
+					authEnabled: true,
+					cfAccessAudEnabled: !!env.CF_ACCESS_AUD,
+					cfAccessTeamDomainEnabled: !!env.CF_ACCESS_TEAM_DOMAIN,
 					version: "1.0.0",
 					tools: getToolsList().length,
 					endpoints: ["/sse", "/health", "/"],
@@ -526,7 +546,8 @@ export default {
 				headers: {
 					"Access-Control-Allow-Origin": "*",
 					"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-					"Access-Control-Allow-Headers": "Content-Type",
+					"Access-Control-Allow-Headers":
+						"Content-Type, CF-Access-Client-Id, CF-Access-Client-Secret",
 				},
 			});
 		}

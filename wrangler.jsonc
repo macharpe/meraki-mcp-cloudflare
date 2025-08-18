@@ -5,12 +5,31 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  
+  // Environment variables
   "vars": {
-    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1"
+    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1",
+    "CF_ACCESS_TEAM_DOMAIN": "macharpe.cloudflareaccess.com"
   },
+  
+  // Custom domain routing
+  "routes": [
+    {
+      "pattern": "meraki-mcp.macharpe.com",
+      "custom_domain": true
+    }
+  ],
+  
+  // Security: Disable public endpoints  
+  "workers_dev": false,       // Disables *.workers.dev URLs
+  "preview_urls": false,      // Disables version preview URLs
+  
+  // Build configuration
   "build": {
     "command": "npm run build"
   },
+  
+  // Monitoring
   "observability": {
     "logs": {
       "enabled": true
