@@ -280,9 +280,9 @@ npx wrangler secret put CF_ACCESS_AUD
         "mcp-remote",
         "https://meraki-mcp.yourdomain.com/sse",
         "--header",
-        "CF-Access-Client-Id: 00abc123def456789.access",
+        "CF-Access-Client-Id: your-client-id",
         "--header",
-        "CF-Access-Client-Secret: 98d57c3451bff29c4701e88729bec58f2e72c3ccb882a0a75f93996210e89ad7"
+        "CF-Access-Client-Secret: your-client-secret"
       ]
     }
   }
@@ -291,8 +291,8 @@ npx wrangler secret put CF_ACCESS_AUD
 
 3. **Replace with your actual values**:
    - `yourdomain.com` → Your actual domain
-   - `00abc123def456789.access` → Your actual Client ID
-   - `98d57c3451bff...` → Your actual Client Secret
+   - `your-client-id` → Your actual Client ID
+   - `your-client-secret` → Your actual Client Secret
 
 4. **Restart Claude Desktop** completely (quit and relaunch)
 
