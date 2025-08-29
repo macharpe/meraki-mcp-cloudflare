@@ -2,15 +2,38 @@
   "name": "meraki-mcp-cloudflare",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-04",
+  "migrations": [
+    {
+      "new_sqlite_classes": ["MerakiMCPAgent"],
+      "tag": "v1"
+    }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ],
   
   // Environment variables
   "vars": {
-    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1",
-    "CF_ACCESS_TEAM_DOMAIN": "macharpe.cloudflareaccess.com"
+    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1"
   },
+
+  // Durable Object binding for MCP Agent
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "MerakiMCPAgent",
+        "name": "MCP_OBJECT"
+      }
+    ]
+  },
+
+  // KV namespace for OAuth storage
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "78b0115cefe644b8915345c3b0e487e3"
+    }
+  ],
   
   // Custom domain routing
   "routes": [
