@@ -22,29 +22,34 @@ A Model Context Protocol (MCP) server that provides AI assistants with direct ac
 The server provides **18 comprehensive Meraki management tools**:
 
 #### 🏢 Organization & Network Management
+
 - **`get_organizations`** - List all organizations in your Meraki account
 - **`get_organization`** - Get detailed information about a specific organization
 - **`get_networks`** - List all networks within an organization
 - **`get_network`** - Get detailed information about a specific network
 
 #### 📱 Device Management
+
 - **`get_devices`** - List all devices within a network
 - **`get_device`** - Get detailed information about a specific device
 - **`get_device_statuses`** - Get device statuses for an organization
 - **`get_management_interface`** - Get management interface settings for a device
 
 #### 🌐 Network Operations
+
 - **`get_clients`** - Get clients connected to a network
 - **`get_network_traffic`** - Get network traffic statistics
 - **`get_network_events`** - Get recent network events
 
 #### 🔗 Switch Management
+
 - **`get_switch_ports`** - Get switch ports for a device
 - **`get_switch_port_statuses`** - Get switch port statuses for a device
 - **`get_switch_routing_interfaces`** - Get routing interfaces for a switch
 - **`get_switch_static_routes`** - Get static routes for a switch
 
 #### 📡 Wireless Management
+
 - **`get_wireless_radio_settings`** - Get wireless radio settings for an access point
 - **`get_wireless_status`** - Get wireless status of an access point
 - **`get_wireless_latency_stats`** - Get wireless latency statistics for an access point
@@ -143,6 +148,134 @@ Before deploying the server, ensure you have:
 3. Enable API access if not already enabled
 4. Generate a new API key and copy it securely
 
+## 🔐 Cloudflare Access OAuth Setup
+
+Before deploying the server, you need to configure Cloudflare Access as the OAuth identity provider. This section walks you through creating the SaaS application that provides the OAuth secrets.
+
+### 1. Create Cloudflare Access Application
+
+1. **Navigate to Cloudflare Zero Trust**:
+   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
+   - Select your account → **Zero Trust** → **Access** → **Applications**
+
+2. **Create SaaS Application**:
+   - Click **"Add an application"**
+   - Select **"SaaS"** application type
+   - Choose **"Custom"** as the SaaS provider
+
+3. **Configure Application Details**:
+
+   ```
+   Application name: Meraki MCP Server
+   Entity ID: meraki-mcp-server
+   Name ID format: Email
+   ```
+
+4. **Set Application Domain**:
+   - Enter your custom domain: `meraki-mcp.yourdomain.com`
+   - This should match the domain in your `wrangler.jsonc` routes
+
+### 2. Configure OAuth Settings
+
+1. **OAuth 2.0 Settings**:
+   - **Grant Type**: Authorization Code
+   - **Redirect URI**: `https://meraki-mcp.yourdomain.com/callback`
+   - **Scopes**: `openid email profile`
+
+2. **Security Settings**:
+   - Enable **PKCE** (Proof Key for Code Exchange)
+   - Set **Token Lifetime**: 1 hour (3600 seconds)
+   - Enable **Refresh Tokens**: Yes
+
+### 3. Extract OAuth Configuration Values
+
+After creating the application, Cloudflare will provide these values needed for your Worker secrets:
+
+```bash
+# From the SaaS application configuration page:
+ACCESS_CLIENT_ID="your_oauth_client_id_here"
+ACCESS_CLIENT_SECRET="your_oauth_client_secret_here"
+
+# From your Cloudflare Zero Trust team settings:
+ACCESS_TOKEN_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/token"
+ACCESS_AUTHORIZATION_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/authorize"
+ACCESS_JWKS_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/certs"
+```
+
+**Note**: Replace `your-team` with your actual Cloudflare Zero Trust team name (found in your team dashboard URL).
+
+### 4. Configure Access Policies
+
+Create access policies to control who can authenticate:
+
+1. **Navigate to Policies**:
+   - Go to **Zero Trust** → **Access** → **Policies**
+
+2. **Create Application Policy**:
+   - **Application**: Select your "Meraki MCP Server" app
+   - **Action**: Allow
+   - **Session Duration**: 1 day
+
+3. **Set Include Rules** (choose one):
+
+   ```
+   # Option 1: Specific email addresses
+   Rule type: Include
+   Selector: Email
+   Value: your-email@domain.com
+
+   # Option 2: Email domain
+   Rule type: Include  
+   Selector: Email domain
+   Value: yourdomain.com
+
+   # Option 3: Everyone (not recommended)
+   Rule type: Include
+   Selector: Everyone
+   ```
+
+### 5. Generate Cookie Encryption Key
+
+The `COOKIE_ENCRYPTION_KEY` is used to encrypt session data and approval cookies for security.
+
+```bash
+# Generate a secure 32-byte base64 key
+openssl rand -base64 32
+```
+
+**Purpose**: This key encrypts:
+
+- **Session cookies**: Contains OAuth state and user approval decisions
+- **PKCE code verifier**: Stored temporarily during OAuth flow
+- **User approval state**: Remembers which clients the user has approved
+
+**Security Note**:
+
+- Keep this key secret and secure
+- If compromised, regenerate it (will invalidate all active sessions)
+- Use a different key for each deployment environment
+
+### 6. Test OAuth Configuration
+
+Before deploying, verify your OAuth setup:
+
+1. **Test Authorization URL**:
+
+   ```bash
+   curl -I "https://your-team.cloudflareaccess.com/cdn-cgi/access/authorize?client_id=YOUR_CLIENT_ID&response_type=code"
+   ```
+
+2. **Verify JWKS Endpoint**:
+
+   ```bash
+   curl "https://your-team.cloudflareaccess.com/cdn-cgi/access/certs"
+   ```
+
+3. **Check Team Configuration**:
+   - Ensure your team domain is active
+   - Verify your identity provider (Google, Azure, etc.) is configured
+   - Test SSO login through the Access dashboard
+
 ## 🚀 Installation & Deployment
 
 ### 1. Clone the Repository
@@ -212,6 +345,7 @@ Update `wrangler.jsonc` with your domain:
 ### 5. Create KV Namespace
 
 Create a KV namespace for OAuth session storage:
+
 ```bash
 npx wrangler kv:namespace create "OAUTH_KV"
 ```
@@ -221,6 +355,7 @@ Update the namespace ID in `wrangler.jsonc` with the returned ID.
 ### 6. Set Required Secrets
 
 Set your API key and OAuth configuration as secrets:
+
 ```bash
 # Required - Meraki API key
 npx wrangler secret put MERAKI_API_KEY
@@ -237,11 +372,13 @@ npx wrangler secret put COOKIE_ENCRYPTION_KEY
 ### 7. Deploy to Cloudflare Workers
 
 First, authenticate with Cloudflare:
+
 ```bash
 npx wrangler login
 ```
 
 Deploy the server:
+
 ```bash
 npx wrangler deploy
 ```
@@ -292,6 +429,7 @@ The first time you use the server, you'll be prompted to complete OAuth authenti
 The server uses these environment variables:
 
 ### Required
+
 - **`MERAKI_API_KEY`** - Your Cisco Meraki API key (stored as Worker secret)
 - **`ACCESS_CLIENT_ID`** - OAuth client ID from Cloudflare Access
 - **`ACCESS_CLIENT_SECRET`** - OAuth client secret from Cloudflare Access
@@ -301,6 +439,7 @@ The server uses these environment variables:
 - **`COOKIE_ENCRYPTION_KEY`** - Key for encrypting session cookies
 
 ### Optional
+
 - **`MERAKI_BASE_URL`** - Base URL for Meraki API (defaults to `https://api.meraki.com/api/v1`)
 
 ### Setting Secrets
@@ -321,21 +460,25 @@ npx wrangler secret put COOKIE_ENCRYPTION_KEY
 Once connected to Claude Desktop, you can use natural language to interact with your Meraki infrastructure:
 
 ### 🏢 Get Organizations
+
 ```
 "Show me all my Meraki organizations"
 ```
 
 ### 🌐 List Networks
+
 ```
 "Get all networks in organization 123456"
 ```
 
 ### 📱 View Devices
+
 ```
 "List all devices in the main office network"
 ```
 
 ### 🔍 Device Details
+
 ```
 "Get details for device with serial ABC123DEF456"
 ```
@@ -425,6 +568,7 @@ To add new Meraki API endpoints:
 4. Add the tool handler in the switch statement
 
 Example:
+
 ```typescript
 // Add to tools array
 {
@@ -448,18 +592,21 @@ case "get_clients":
 ## 🔒 Security Features
 
 ### 🛡️ Zero Trust Architecture
+
 - **Cloudflare Access**: Enterprise-grade authentication at the edge
 - **Service Tokens**: Machine-to-machine authentication without user interaction
 - **Custom Domain**: Professional branded endpoint with automatic SSL
 - **Edge Validation**: All authentication happens at Cloudflare's edge before reaching your Worker
 
 ### 🔐 Data Protection
+
 - **API Keys**: Stored as encrypted Cloudflare Worker secrets
 - **JWT Validation**: Cloudflare Access provides signed JWT tokens
 - **HTTPS Only**: All communication encrypted in transit
 - **No Data Storage**: Server is stateless with no data persistence
 
 ### 🚨 Access Control
+
 - **AUD Token**: Application-specific audience validation
 - **Team Domain**: Organization-level access control
 - **Rate Limiting**: Built-in DDoS protection via Cloudflare
@@ -470,19 +617,23 @@ case "get_clients":
 ### ⚠️ Common Issues
 
 **"MERAKI_API_KEY not configured"**
+
 - Ensure you've set the secret: `npx wrangler secret put MERAKI_API_KEY`
 
 **"403 Forbidden" from custom domain**  
+
 - Check Cloudflare Access configuration
 - Verify service tokens are correct
 - Ensure domain is properly configured in Cloudflare
 
 **"Server disconnected" in Claude Desktop**
+
 - Check your Claude Desktop config file syntax
 - Verify service tokens are correctly formatted
 - Restart Claude Desktop after config changes
 
 **"Unauthorized - Valid service token required"**
+
 - Verify service tokens in Claude Desktop config
 - Check that Cloudflare Access application is properly configured
 - Ensure the custom domain is working
@@ -490,11 +641,13 @@ case "get_clients":
 ### 🔍 Debugging
 
 Check Cloudflare Workers logs:
+
 ```bash
 npx wrangler tail
 ```
 
 View Claude Desktop MCP logs:
+
 ```bash
 # macOS
 tail -f ~/Library/Logs/Claude/mcp-server-meraki.log
@@ -504,6 +657,7 @@ Get-Content $env:APPDATA\Claude\logs\mcp-server-meraki.log -Wait
 ```
 
 Test authentication manually:
+
 ```bash
 curl -H "CF-Access-Client-Id: your-client-id" \
      -H "CF-Access-Client-Secret: your-client-secret" \
@@ -526,6 +680,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ## 📊 Code Statistics
 
 ### Project Metrics
+
 ```
 📁 Total Files: ~25
 📄 Source Files: 7 TypeScript files
@@ -536,6 +691,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ```
 
 ### File Breakdown
+
 ```
 src/
 ├── index.ts              # ~400 lines - Durable Object MCP Agent
@@ -550,6 +706,7 @@ src/
 ```
 
 ### API Coverage
+
 - **Organizations**: 2 methods (list, get details)
 - **Networks**: 4 methods (list, details, traffic, events)  
 - **Devices**: 4 methods (list, details, status, management)
@@ -558,6 +715,7 @@ src/
 - **Clients**: 1 method (network clients)
 
 ### Performance
+
 - **Cold Start**: ~50ms on Cloudflare Workers (Durable Objects)
 - **Response Time**: <100ms for most API calls  
 - **Rate Limits**: Respects Meraki API limits (5 requests/second)
