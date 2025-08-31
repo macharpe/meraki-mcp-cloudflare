@@ -12,4 +12,7 @@ export interface Env {
 
 	// KV namespace for OAuth session storage
 	OAUTH_KV: KVNamespace;
+
+	// Durable Object binding for MCP Agent
+	MCP_OBJECT: DurableObjectNamespace;
 }

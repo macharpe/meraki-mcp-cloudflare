@@ -77,11 +77,11 @@ export async function handleAccessRequest(
 			request,
 			env.COOKIE_ENCRYPTION_KEY,
 		);
-		if (!state.oauthReqInfo) {
+		if (!state || typeof state !== 'object' || !('oauthReqInfo' in state)) {
 			return new Response("Invalid request", { status: 400 });
 		}
 
-		return redirectToAccess(request, env, state.oauthReqInfo, headers);
+		return redirectToAccess(request, env, (state as any).oauthReqInfo, headers);
 	}
 
 	if (request.method === "GET" && pathname === "/callback") {
@@ -95,8 +95,10 @@ export async function handleAccessRequest(
 			return new Response("Invalid state", { status: 400 });
 		}
 
-		// Retrieve code verifier from KV storage
-		const codeVerifier = await env.OAUTH_KV.get(`code_verifier:${state}`);
+		// Retrieve code verifier from KV storage using the same key format used for storage
+		// The storage key is created by base64url encoding the oauthReqInfo, so we recreate it here
+		const stateKey = base64urlEncode(JSON.stringify(oauthReqInfo));
+		const codeVerifier = await env.OAUTH_KV.get(`code_verifier:${stateKey}`);
 		if (!codeVerifier) {
 			return new Response("Missing code verifier", { status: 400 });
 		}
@@ -115,7 +117,7 @@ export async function handleAccessRequest(
 		}
 
 		// Clean up code verifier from KV
-		await env.OAUTH_KV.delete(`code_verifier:${state}`);
+		await env.OAUTH_KV.delete(`code_verifier:${stateKey}`);
 
 		const idTokenClaims = await verifyToken(env, idToken);
 		const user = {
