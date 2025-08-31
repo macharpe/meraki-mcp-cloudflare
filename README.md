@@ -401,7 +401,8 @@ Your server will be available at: `https://meraki-mcp.yourdomain.com`
     "meraki": {
       "command": "npx",
       "args": [
-        "workers-mcp",
+        "-y",
+        "mcp-remote@latest",
         "https://meraki-mcp.yourdomain.com"
       ]
     }

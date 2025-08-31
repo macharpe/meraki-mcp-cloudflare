@@ -166,7 +166,7 @@ export interface ApprovalDialogOptions {
 	 * Arbitrary state data to pass through the approval flow
 	 * Will be encoded in the form and returned when approval is complete
 	 */
-	state: any;
+	state: unknown;
 }
 
 /**
@@ -413,7 +413,7 @@ export function renderApprovalDialog(
  */
 export interface ParsedApprovalResult {
 	/** The original state object passed through the form. */
-	state: any;
+	state: unknown;
 	/** Headers to set on the redirect response, including the Set-Cookie header. */
 	headers: Record<string, string>;
 }
@@ -429,7 +429,7 @@ export async function parseRedirectApproval(
 		throw new Error("Invalid request method. Expected POST.");
 	}
 
-	let state: any;
+	let state: unknown;
 	let clientId: string | undefined;
 
 	try {
@@ -441,7 +441,7 @@ export async function parseRedirectApproval(
 		}
 
 		state = JSON.parse(base64urlDecode(encodedState));
-		clientId = state?.oauthReqInfo?.clientId;
+		clientId = (state as any)?.oauthReqInfo?.clientId;
 
 		if (!clientId) {
 			throw new Error("Could not extract clientId from state object.");
