@@ -1,0 +1,82 @@
+name: 🚀 Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 📦 Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Check for new version in CHANGELOG
+        id: version
+        run: |
+          NEW_VERSION=$(sed -n 's/^## \[\([0-9]*\.[0-9]*\.[0-9]*\)\] - .*/\1/p' CHANGELOG.md | head -n 1)
+
+          if [ -z "$NEW_VERSION" ]; then
+            echo "No version found in CHANGELOG.md"
+            echo "create_release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found version: $NEW_VERSION"
+
+          if git tag -l | grep -q "^v$NEW_VERSION$"; then
+            echo "Version v$NEW_VERSION already exists as a tag"
+            echo "create_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "create_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📝 Extract release notes
+        if: steps.version.outputs.create_release == 'true'
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          awk "
+            /^## \[$VERSION\]/ { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          " CHANGELOG.md > release_notes.txt
+
+          if [ ! -s release_notes.txt ]; then
+            echo "No release notes found for version $VERSION"
+            exit 1
+          fi
+
+          echo "Release notes extracted successfully"
+
+      - name: 🏷️ Create git tag
+        if: steps.version.outputs.create_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: 🚀 Create GitHub Release
+        if: steps.version.outputs.create_release == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: 🎉 Release v${{ steps.version.outputs.version }}
+          body_path: release_notes.txt
+          draft: false
+          prerelease: false
