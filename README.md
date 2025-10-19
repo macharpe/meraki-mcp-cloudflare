@@ -121,38 +121,45 @@ npx wrangler secret put CACHE_TTL_JWKS          # Default: 3600 (1 hour)
 
 **Cache Storage**: Uses Cloudflare KV with automatic expiration and global replication.
 
-## 🔐 Authentication & OAuth Discovery
+## 🔐 Authentication
 
-The server implements OAuth 2.1 with PKCE and full RFC-compliant discovery endpoints for enhanced client compatibility.
+The server uses **Meraki API key authentication** for simplicity and universal compatibility with all MCP clients.
 
-> 📋 **Detailed Flow**: See [`docs/authentication-flow.md`](docs/authentication-flow.md) for the complete authentication sequence diagram.
+> 📋 **Detailed Flow**: See [`docs/authentication-flow.md`](docs/authentication-flow.md) for the complete authentication architecture diagram.
 
-### 🔍 OAuth Discovery Endpoints
+### 🔑 API Key Authentication
 
-The server provides standard OAuth discovery endpoints for automatic client configuration:
+- **MCP Endpoints**: Publicly accessible (no OAuth required)
+- **Meraki API Authentication**: Uses `MERAKI_API_KEY` Worker secret
+- **Universal Compatibility**: Works with all MCP clients (Claude Desktop, Cloudflare AI Playground, custom clients)
+- **Simple Setup**: Just add the MCP server URL - no OAuth configuration needed
 
-| Endpoint | Purpose | RFC |
-|----------|---------|-----|
-| `/.well-known/oauth-authorization-server` | OAuth metadata discovery | RFC 8414 |
-| `/.well-known/jwks.json` | JSON Web Key Set for token verification | RFC 7517 |
-| `/register` | Dynamic client registration | RFC 7591 |
-| `/authorize` | OAuth authorization endpoint | RFC 6749 |
-| `/token` | Token exchange endpoint | RFC 6749 |
-
-**Example OAuth Discovery:**
-```bash
-curl https://meraki-mcp.macharpe.com/.well-known/oauth-authorization-server
+**Current Architecture:**
 ```
+MCP Client → Worker (public /mcp endpoint) → Meraki API (with API key)
+```
+
+### 🔍 Optional OAuth Infrastructure (Not Active)
+
+The codebase includes OAuth 2.1 + PKCE infrastructure for **future enterprise use** if per-user authentication is needed:
+
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `/.well-known/oauth-authorization-server` | Available | OAuth metadata discovery (RFC 8414) |
+| `/.well-known/jwks.json` | Available | JSON Web Key Set (RFC 7517) |
+| `/register` | Available | Dynamic client registration (RFC 7591) |
+| `/authorize` | Available | OAuth authorization endpoint |
+| `/token` | Available | Token exchange endpoint |
+
+> ⚠️ **Note**: These OAuth endpoints exist in the code but are **not protecting MCP endpoints**. They can be activated in the future for enterprise SSO if needed.
 
 ### 🛡️ Security Features
 
-- **OAuth 2.1 + PKCE**: Enhanced security with Proof Key for Code Exchange (RFC 7636)
-- **JWT Tokens**: Cryptographically signed tokens from Cloudflare Access
-- **Discovery Metadata**: RFC 8414 compliant OAuth server metadata
-- **Dynamic Registration**: RFC 7591 compliant client registration
-- **User Claims**: Extract user context from ID tokens for personalization
-- **Session Storage**: Secure KV-based storage for OAuth state and tokens
-- **Enterprise SSO**: Supports Google, Azure AD, SAML, and other identity providers
+- **Meraki API Key**: Secure Worker secret storage
+- **Edge Security**: Cloudflare's global network protection
+- **Rate Limiting**: KV caching prevents API abuse
+- **HTTPS Only**: All traffic encrypted in transit
+- **Custom Domain**: No public workers.dev URLs (security best practice)
 
 ### 📁 Project Structure
 
@@ -186,11 +193,10 @@ meraki-mcp-cloudflare/
 Before deploying the server, ensure you have:
 
 1. **🌐 Cloudflare Account**: Free account at [cloudflare.com](https://cloudflare.com)
-2. **🌍 Domain in Cloudflare**: Your domain must be managed by Cloudflare for OAuth authentication
-3. **🔑 Cisco Meraki Account**: With API access enabled
-4. **🎫 Meraki API Key**: Generated from your Meraki Dashboard
-5. **💻 Node.js**: Version 18 or higher
-6. **📦 Git**: For cloning the repository
+2. **🔑 Cisco Meraki Account**: With API access enabled
+3. **🎫 Meraki API Key**: Generated from your Meraki Dashboard
+4. **💻 Node.js**: Version 18 or higher
+5. **📦 Git**: For cloning the repository
 
 ### 🔑 Getting Your Meraki API Key
 
@@ -198,134 +204,6 @@ Before deploying the server, ensure you have:
 2. Navigate to **Organization > Settings > Dashboard API access**
 3. Enable API access if not already enabled
 4. Generate a new API key and copy it securely
-
-## 🔐 Cloudflare Access OAuth Setup
-
-Before deploying the server, you need to configure Cloudflare Access as the OAuth identity provider. This section walks you through creating the SaaS application that provides the OAuth secrets.
-
-### 1. Create Cloudflare Access Application
-
-1. **Navigate to Cloudflare Zero Trust**:
-   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
-   - Select your account → **Zero Trust** → **Access** → **Applications**
-
-2. **Create SaaS Application**:
-   - Click **"Add an application"**
-   - Select **"SaaS"** application type
-   - Choose **"Custom"** as the SaaS provider
-
-3. **Configure Application Details**:
-
-   ```
-   Application name: Meraki MCP Server
-   Entity ID: meraki-mcp-server
-   Name ID format: Email
-   ```
-
-4. **Set Application Domain**:
-   - Enter your custom domain: `meraki-mcp.yourdomain.com`
-   - This should match the domain in your `wrangler.jsonc` routes
-
-### 2. Configure OAuth Settings
-
-1. **OAuth 2.0 Settings**:
-   - **Grant Type**: Authorization Code
-   - **Redirect URI**: `https://meraki-mcp.yourdomain.com/callback`
-   - **Scopes**: `openid email profile`
-
-2. **Security Settings**:
-   - Enable **PKCE** (Proof Key for Code Exchange)
-   - Set **Token Lifetime**: 1 hour (3600 seconds)
-   - Enable **Refresh Tokens**: Yes
-
-### 3. Extract OAuth Configuration Values
-
-After creating the application, Cloudflare will provide these values needed for your Worker secrets:
-
-```bash
-# From the SaaS application configuration page:
-ACCESS_CLIENT_ID="your_oauth_client_id_here"
-ACCESS_CLIENT_SECRET="your_oauth_client_secret_here"
-
-# From your Cloudflare Zero Trust team settings:
-ACCESS_TOKEN_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/token"
-ACCESS_AUTHORIZATION_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/authorize"
-ACCESS_JWKS_URL="https://your-team.cloudflareaccess.com/cdn-cgi/access/certs"
-```
-
-**Note**: Replace `your-team` with your actual Cloudflare Zero Trust team name (found in your team dashboard URL).
-
-### 4. Configure Access Policies
-
-Create access policies to control who can authenticate:
-
-1. **Navigate to Policies**:
-   - Go to **Zero Trust** → **Access** → **Policies**
-
-2. **Create Application Policy**:
-   - **Application**: Select your "Meraki MCP Server" app
-   - **Action**: Allow
-   - **Session Duration**: 1 day
-
-3. **Set Include Rules** (choose one):
-
-   ```
-   # Option 1: Specific email addresses
-   Rule type: Include
-   Selector: Email
-   Value: your-email@domain.com
-
-   # Option 2: Email domain
-   Rule type: Include  
-   Selector: Email domain
-   Value: yourdomain.com
-
-   # Option 3: Everyone (not recommended)
-   Rule type: Include
-   Selector: Everyone
-   ```
-
-### 5. Generate Cookie Encryption Key
-
-The `COOKIE_ENCRYPTION_KEY` is used to encrypt session data and approval cookies for security.
-
-```bash
-# Generate a secure 32-byte base64 key
-openssl rand -base64 32
-```
-
-**Purpose**: This key encrypts:
-
-- **Session cookies**: Contains OAuth state and user approval decisions
-- **PKCE code verifier**: Stored temporarily during OAuth flow
-- **User approval state**: Remembers which clients the user has approved
-
-**Security Note**:
-
-- Keep this key secret and secure
-- If compromised, regenerate it (will invalidate all active sessions)
-- Use a different key for each deployment environment
-
-### 6. Test OAuth Configuration
-
-Before deploying, verify your OAuth setup:
-
-1. **Test Authorization URL**:
-
-   ```bash
-   curl -I "https://your-team.cloudflareaccess.com/cdn-cgi/access/authorize?client_id=YOUR_CLIENT_ID&response_type=code"
-   ```
-
-2. **Verify JWKS Endpoint**:
-
-   ```bash
-   curl "https://your-team.cloudflareaccess.com/cdn-cgi/access/certs"
-   ```
-
-3. **Check Team Configuration**:
-   - Ensure your team domain is active
-   - Verify your identity provider (Google, Azure, etc.) is configured
-   - Test SSO login through the Access dashboard
 
 ## 🚀 Installation & Deployment
 
@@ -504,10 +382,10 @@ Your server will be available at: `https://meraki-mcp.yourdomain.com`
 Check that the server is properly connected:
 
 1. Open Claude Desktop
-2. Start a new conversation  
+2. Start a new conversation
 3. Try: "List my Meraki organizations"
 
-The first time you use the server, you'll be prompted to complete OAuth authentication in your browser.
+The server should respond immediately with your Meraki organization data.
 
 ## 🌍 Environment Variables
 
@@ -516,12 +394,6 @@ The server uses these environment variables:
 ### Required
 
 - **`MERAKI_API_KEY`** - Your Cisco Meraki API key (stored as Worker secret)
-- **`ACCESS_CLIENT_ID`** - OAuth client ID from Cloudflare Access
-- **`ACCESS_CLIENT_SECRET`** - OAuth client secret from Cloudflare Access
-- **`ACCESS_TOKEN_URL`** - OAuth token endpoint URL
-- **`ACCESS_AUTHORIZATION_URL`** - OAuth authorization endpoint URL
-- **`ACCESS_JWKS_URL`** - JWKS endpoint for token verification
-- **`COOKIE_ENCRYPTION_KEY`** - Key for encrypting session cookies
 
 ### Optional
 
@@ -529,21 +401,36 @@ The server uses these environment variables:
 
 ### Cache Configuration (Optional)
 
-- **`CACHE_TTL_ORGANIZATIONS`** - Cache TTL for organization lists in seconds (defaults to 1800 / 30 minutes)
-- **`CACHE_TTL_NETWORKS`** - Cache TTL for network lists in seconds (defaults to 900 / 15 minutes)
-- **`CACHE_TTL_JWKS`** - Cache TTL for JWKS keys in seconds (defaults to 3600 / 1 hour)
+Configure cache TTL values to optimize performance:
+
+- **`CACHE_TTL_ORGANIZATIONS`** - Cache TTL for organization lists in seconds (default: 1800 / 30 minutes)
+- **`CACHE_TTL_NETWORKS`** - Cache TTL for network lists in seconds (default: 900 / 15 minutes)
+- **`CACHE_TTL_JWKS`** - Cache TTL for JWKS keys in seconds (default: 3600 / 1 hour)
+
+### OAuth Configuration (Optional - Not Active)
+
+These environment variables are for future OAuth functionality if needed:
+
+- **`ACCESS_CLIENT_ID`** - OAuth client ID from Cloudflare Access (not currently used)
+- **`ACCESS_CLIENT_SECRET`** - OAuth client secret from Cloudflare Access (not currently used)
+- **`ACCESS_TOKEN_URL`** - OAuth token endpoint URL (not currently used)
+- **`ACCESS_AUTHORIZATION_URL`** - OAuth authorization endpoint URL (not currently used)
+- **`ACCESS_JWKS_URL`** - JWKS endpoint for token verification (not currently used)
+- **`COOKIE_ENCRYPTION_KEY`** - Key for encrypting session cookies (not currently used)
 
 ### Setting Secrets
 
 ```bash
-# Required
+# Required - Meraki API authentication
 npx wrangler secret put MERAKI_API_KEY
-npx wrangler secret put ACCESS_CLIENT_ID
-npx wrangler secret put ACCESS_CLIENT_SECRET
-npx wrangler secret put ACCESS_TOKEN_URL
-npx wrangler secret put ACCESS_AUTHORIZATION_URL
-npx wrangler secret put ACCESS_JWKS_URL
-npx wrangler secret put COOKIE_ENCRYPTION_KEY
+
+# Optional - Only if activating OAuth in the future
+# npx wrangler secret put ACCESS_CLIENT_ID
+# npx wrangler secret put ACCESS_CLIENT_SECRET
+# npx wrangler secret put ACCESS_TOKEN_URL
+# npx wrangler secret put ACCESS_AUTHORIZATION_URL
+# npx wrangler secret put ACCESS_JWKS_URL
+# npx wrangler secret put COOKIE_ENCRYPTION_KEY
 ```
 
 ## 💡 Usage Examples
