@@ -97,6 +97,7 @@ The server implements intelligent KV caching to optimize performance and reduce 
 
 - **Organization Lists**: Cached for 30 minutes - organizations rarely change
 - **Network Lists**: Cached for 15 minutes - moderate update frequency
+- **Client Lists**: Cached for 5 minutes - clients connect/disconnect frequently
 - **JWKS Keys**: Cached for 1 hour - JWT verification keys are stable
 - **Graceful Fallback**: All methods work without cache if KV unavailable
 
@@ -160,13 +161,20 @@ meraki-mcp-cloudflare/
 ├── src/
 │   ├── index.ts              # Main Durable Object MCP Agent
 │   ├── access-handler.ts     # OAuth authentication handler
-│   ├── workers-oauth-utils.ts# OAuth utility functions
+│   ├── oauth-helpers.ts      # OAuth utility functions
+│   ├── workers-oauth-utils.ts# Workers OAuth utilities
 │   ├── services/
-│   │   └── merakiapi.ts      # Meraki API service layer
+│   │   ├── merakiapi.ts      # Meraki API service layer
+│   │   └── cache.ts          # KV caching service
 │   ├── types/
 │   │   ├── env.ts            # Environment type definitions
 │   │   └── meraki.ts         # Meraki API type definitions
-│   └── errors.ts             # Custom error classes
+│   └── tests/
+│       └── index.test.ts     # Test files
+├── docs/
+│   └── authentication-flow.md# OAuth flow documentation
+├── scripts/
+│   └── pre-deploy.sh         # Pre-deployment checks
 ├── wrangler.jsonc            # Cloudflare Workers configuration
 ├── package.json              # Dependencies and scripts
 ├── CLAUDE.md                 # Claude Code instructions
@@ -350,13 +358,24 @@ Update `wrangler.jsonc` with your domain:
 {
   "name": "meraki-mcp-cloudflare",
   "main": "src/index.ts",
-  "compatibility_date": "2025-08-04",
+  "compatibility_date": "2025-03-07",
+  "migrations": [
+    {
+      "new_sqlite_classes": ["MerakiMCPAgent"],
+      "tag": "v1"
+    }
+  ],
   "compatibility_flags": ["nodejs_compat"],
-  
+
+  // Environment variables
   "vars": {
-    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1"
+    "MERAKI_BASE_URL": "https://api.meraki.com/api/v1",
+    "CACHE_TTL_ORGANIZATIONS": "1800",
+    "CACHE_TTL_NETWORKS": "900",
+    "CACHE_TTL_JWKS": "3600"
   },
-  
+
+  // Durable Object binding for MCP Agent
   "durable_objects": {
     "bindings": [
       {
@@ -366,26 +385,40 @@ Update `wrangler.jsonc` with your domain:
     ]
   },
 
+  // KV namespaces for OAuth storage and API response caching
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",
-      "id": "your-oauth-kv-namespace-id"
+      "id": "78b0115cefe644b8915345c3b0e487e3"
     },
     {
       "binding": "CACHE_KV",
-      "id": "your-cache-kv-namespace-id"
+      "id": "df5d8edf054747b2a3e957dd7b1ec355"
     }
   ],
-  
+
+  // Custom domain routing
   "routes": [
     {
       "pattern": "meraki-mcp.yourdomain.com",
       "custom_domain": true
     }
   ],
-  
+
+  // Security: Disable public endpoints
   "workers_dev": false,
-  "preview_urls": false
+  "preview_urls": false,
+
+  // Build configuration
+  "build": {
+    "command": "npm run build"
+  },
+
+  // Monitoring
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
 }
 ```
 
