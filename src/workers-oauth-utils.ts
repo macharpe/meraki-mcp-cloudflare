@@ -18,7 +18,7 @@ function stringToArrayBuffer(str: string): ArrayBuffer {
 	return buf;
 }
 
-import type { ClientInfo } from "@cloudflare/workers-oauth-provider";
+import type { ClientInfo } from "./oauth-helpers";
 
 const COOKIE_NAME = "meraki-mcp-approved-clients";
 const ONE_YEAR_IN_SECONDS = 31536000;

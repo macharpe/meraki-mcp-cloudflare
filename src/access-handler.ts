@@ -18,10 +18,9 @@ function stringToArrayBuffer(str: string): ArrayBuffer {
 	return buf;
 }
 
-import type {
-	AuthRequest,
-	OAuthHelpers,
-} from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest } from "./oauth-helpers";
+import { createOAuthHelpers } from "./oauth-helpers";
+import { CacheKeys, CacheService, CacheTTL } from "./services/cache";
 import type { Env } from "./types/env";
 import {
 	clientIdAlreadyApproved,
@@ -31,7 +30,7 @@ import {
 	renderApprovalDialog,
 } from "./workers-oauth-utils";
 
-type EnvWithOauth = Env & { OAUTH_PROVIDER: OAuthHelpers };
+type EnvWithOauth = Env;
 
 export async function handleAccessRequest(
 	request: Request,
@@ -41,7 +40,8 @@ export async function handleAccessRequest(
 	const { pathname, searchParams } = new URL(request.url);
 
 	if (request.method === "GET" && pathname === "/authorize") {
-		const oauthReqInfo = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+		const oauthHelpers = createOAuthHelpers(env);
+		const oauthReqInfo = await oauthHelpers.parseAuthRequest(request);
 		const { clientId } = oauthReqInfo;
 		if (!clientId) {
 			return new Response("Invalid request", { status: 400 });
@@ -60,7 +60,7 @@ export async function handleAccessRequest(
 
 		// Show approval dialog
 		return renderApprovalDialog(request, {
-			client: await env.OAUTH_PROVIDER.lookupClient(clientId),
+			client: await oauthHelpers.lookupClient(clientId),
 			server: {
 				name: "Cisco Meraki MCP Server",
 				logo: "https://avatars.githubusercontent.com/u/314135?s=200&v=4",
@@ -77,7 +77,7 @@ export async function handleAccessRequest(
 			request,
 			env.COOKIE_ENCRYPTION_KEY,
 		);
-		if (!state || typeof state !== 'object' || !('oauthReqInfo' in state)) {
+		if (!state || typeof state !== "object" || !("oauthReqInfo" in state)) {
 			return new Response("Invalid request", { status: 400 });
 		}
 
@@ -127,7 +127,8 @@ export async function handleAccessRequest(
 		};
 
 		// Return back to the MCP client a new token
-		const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+		const oauthHelpers = createOAuthHelpers(env);
+		const { redirectTo } = await oauthHelpers.completeAuthorization({
 			metadata: {
 				label: user.name,
 			},
@@ -145,6 +146,71 @@ export async function handleAccessRequest(
 		return Response.redirect(redirectTo);
 	}
 
+	// Handle dynamic client registration
+	if (request.method === "POST" && pathname === "/register") {
+		console.error(`[DEBUG] Client registration request`);
+
+		try {
+			const body = (await request.json()) as any;
+			const { client_name, redirect_uris, scope, grant_types } = body;
+
+			// Generate a new client ID and secret
+			const clientId = `meraki_mcp_${crypto.randomUUID()}`;
+			const clientSecret = crypto.randomUUID();
+
+			// Store client registration in KV
+			const clientData = {
+				client_id: clientId,
+				client_secret: clientSecret,
+				client_name: client_name || "MCP Client",
+				redirect_uris: redirect_uris || [
+					`${new URL(request.url).origin}/callback`,
+				],
+				scope: scope || "meraki:read",
+				grant_types: grant_types || ["authorization_code"],
+				registered_at: new Date().toISOString(),
+			};
+
+			await env.OAUTH_KV.put(`client:${clientId}`, JSON.stringify(clientData));
+
+			// Return client credentials (following RFC 7591)
+			return new Response(
+				JSON.stringify({
+					client_id: clientId,
+					client_secret: clientSecret,
+					client_name: clientData.client_name,
+					redirect_uris: clientData.redirect_uris,
+					grant_types: clientData.grant_types,
+					scope: clientData.scope,
+					token_endpoint_auth_method: "client_secret_post",
+				}),
+				{
+					status: 201,
+					headers: {
+						"Content-Type": "application/json",
+						"Access-Control-Allow-Origin": "*",
+						"Cache-Control": "no-store",
+					},
+				},
+			);
+		} catch (error) {
+			console.error(`[ERROR] Client registration failed:`, error);
+			return new Response(
+				JSON.stringify({
+					error: "invalid_request",
+					error_description: "Invalid registration request",
+				}),
+				{
+					status: 400,
+					headers: {
+						"Content-Type": "application/json",
+						"Access-Control-Allow-Origin": "*",
+					},
+				},
+			);
+		}
+	}
+
 	if (pathname === "/health") {
 		return new Response(
 			JSON.stringify({
@@ -160,6 +226,9 @@ export async function handleAccessRequest(
 					"/authorize",
 					"/callback",
 					"/token",
+					"/register",
+					"/.well-known/oauth-authorization-server",
+					"/.well-known/jwks.json",
 				],
 			}),
 			{
@@ -211,21 +280,37 @@ async function redirectToAccess(
 }
 
 /**
- * Helper to get the Access public keys from the certs endpoint
+ * Helper to get the Access public keys from the certs endpoint with caching
  */
 async function fetchAccessPublicKey(env: Env, kid: string) {
 	if (!env.ACCESS_JWKS_URL) {
 		throw new Error("access jwks url not provided");
 	}
-	// TODO: cache this
-	const resp = await fetch(env.ACCESS_JWKS_URL);
-	const keys = (await resp.json()) as {
-		keys: (JsonWebKey & { kid: string })[];
-	};
+
+	const cache = new CacheService(env);
+	const cacheKey = CacheKeys.jwks(env.ACCESS_JWKS_URL);
+
+	// Try to get cached JWKS
+	let keys = await cache.get<{ keys: (JsonWebKey & { kid: string })[] }>(
+		cacheKey,
+	);
+
+	if (!keys) {
+		// Cache miss - fetch fresh JWKS
+		const resp = await fetch(env.ACCESS_JWKS_URL);
+		keys = (await resp.json()) as {
+			keys: (JsonWebKey & { kid: string })[];
+		};
+
+		// Cache the JWKS with TTL
+		await cache.set(cacheKey, keys, { ttl: CacheTTL.JWKS_KEYS(env) });
+	}
+
 	const jwk = keys.keys.filter((key) => key.kid === kid)[0];
 	if (!jwk) {
 		throw new Error(`Key with kid ${kid} not found`);
 	}
+
 	const key = await crypto.subtle.importKey(
 		"jwk",
 		jwk,

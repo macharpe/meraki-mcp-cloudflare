@@ -73,6 +73,8 @@ worker-configuration.d.ts
 
 # CLAUDE.md
 CLAUDE.md
+.claude
 
-# Roadmap
+# roadmap and personal documentation
 roadmap/
+documentation/
