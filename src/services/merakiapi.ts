@@ -1,6 +1,11 @@
 // src/services/merakiapi.ts - Meraki API Service Layer
 import { APIError, MerakiError } from "../errors";
+import type { Env } from "../types/env";
 import type {
+	ApplianceContentFiltering,
+	ApplianceSecurityEvent,
+	ApplianceTrafficShaping,
+	ApplianceVpnSiteToSite,
 	Client,
 	Device,
 	DeviceStatus,
@@ -13,21 +18,35 @@ import type {
 	SwitchPortStatus,
 	SwitchRoutingInterface,
 	SwitchStaticRoute,
+	WirelessChannelUtilization,
+	WirelessClientConnectivityEvent,
+	WirelessConnectionStats,
 	WirelessLatencyStats,
 	WirelessRadioSettings,
+	WirelessRfProfile,
+	WirelessSignalQuality,
 	WirelessStatus,
 } from "../types/meraki";
+import { CacheKeys, CacheService, CacheTTL } from "./cache";
 
 export class MerakiAPIService {
 	private apiKey: string;
 	private baseUrl: string;
+	private cache: CacheService | null;
+	private env: Env | null;
 
-	constructor(apiKey: string, baseUrl = "https://api.meraki.com/api/v1") {
+	constructor(
+		apiKey: string,
+		baseUrl = "https://api.meraki.com/api/v1",
+		env?: Env,
+	) {
 		if (!apiKey) {
 			throw new MerakiError("MERAKI_API_KEY is required");
 		}
 		this.apiKey = apiKey;
 		this.baseUrl = baseUrl;
+		this.cache = env ? new CacheService(env) : null;
+		this.env = env || null;
 	}
 
 	private async makeRequest<T>(
@@ -69,6 +88,13 @@ export class MerakiAPIService {
 
 	// Organizations
 	async getOrganizations(): Promise<Organization[]> {
+		if (this.cache && this.env) {
+			return this.cache.getOrSet(
+				CacheKeys.organizations(),
+				() => this.makeRequest<Organization[]>("/organizations"),
+				{ ttl: CacheTTL.ORGANIZATIONS(this.env) },
+			);
+		}
 		return this.makeRequest<Organization[]>("/organizations");
 	}
 
@@ -78,6 +104,16 @@ export class MerakiAPIService {
 
 	// Networks
 	async getNetworks(organizationId: string): Promise<Network[]> {
+		if (this.cache && this.env) {
+			return this.cache.getOrSet(
+				CacheKeys.networks(organizationId),
+				() =>
+					this.makeRequest<Network[]>(
+						`/organizations/${organizationId}/networks`,
+					),
+				{ ttl: CacheTTL.NETWORKS(this.env) },
+			);
+		}
 		return this.makeRequest<Network[]>(
 			`/organizations/${organizationId}/networks`,
 		);
@@ -104,9 +140,60 @@ export class MerakiAPIService {
 
 	// Clients
 	async getClients(networkId: string, timespan = 86400): Promise<Client[]> {
-		return this.makeRequest<Client[]>(
-			`/networks/${networkId}/clients?timespan=${timespan}`,
-		);
+		if (this.cache && this.env) {
+			return this.cache.getOrSet(
+				CacheKeys.clients(networkId, timespan),
+				() => this.fetchAllClients(networkId, timespan),
+				{ ttl: CacheTTL.CLIENTS },
+			);
+		}
+		return this.fetchAllClients(networkId, timespan);
+	}
+
+	private async fetchAllClients(
+		networkId: string,
+		timespan: number,
+	): Promise<Client[]> {
+		const allClients: Client[] = [];
+		let startingAfter: string | undefined;
+		const perPage = 1000; // Maximum allowed by Meraki API
+
+		while (true) {
+			const params = new URLSearchParams({
+				timespan: timespan.toString(),
+				perPage: perPage.toString(),
+			});
+
+			if (startingAfter) {
+				params.append("startingAfter", startingAfter);
+			}
+
+			const clients = await this.makeRequest<Client[]>(
+				`/networks/${networkId}/clients?${params.toString()}`,
+			);
+
+			allClients.push(...clients);
+
+			// If we got fewer than perPage clients, we've reached the end
+			if (clients.length < perPage) {
+				break;
+			}
+
+			// Use the last client's ID for pagination
+			const lastClient = clients[clients.length - 1];
+			if (lastClient?.id) {
+				startingAfter = lastClient.id;
+			} else {
+				// Fallback to MAC address if ID is not available
+				startingAfter = lastClient?.mac;
+			}
+
+			if (!startingAfter) {
+				break;
+			}
+		}
+
+		return allClients;
 	}
 
 	// Switch Ports
@@ -185,6 +272,84 @@ export class MerakiAPIService {
 	): Promise<NetworkEvent[]> {
 		return this.makeRequest<NetworkEvent[]>(
 			`/networks/${networkId}/events?perPage=${perPage}`,
+		);
+	}
+
+	// Appliance Management Methods
+	async getApplianceVpnSiteToSite(
+		networkId: string,
+	): Promise<ApplianceVpnSiteToSite> {
+		return this.makeRequest<ApplianceVpnSiteToSite>(
+			`/networks/${networkId}/appliance/vpn/siteToSiteVpn`,
+		);
+	}
+
+	async getApplianceContentFiltering(
+		networkId: string,
+	): Promise<ApplianceContentFiltering> {
+		return this.makeRequest<ApplianceContentFiltering>(
+			`/networks/${networkId}/appliance/contentFiltering`,
+		);
+	}
+
+	async getApplianceSecurityEvents(
+		networkId: string,
+		timespan = 86400,
+	): Promise<ApplianceSecurityEvent[]> {
+		return this.makeRequest<ApplianceSecurityEvent[]>(
+			`/networks/${networkId}/appliance/security/events?timespan=${timespan}`,
+		);
+	}
+
+	async getApplianceTrafficShaping(
+		networkId: string,
+	): Promise<ApplianceTrafficShaping> {
+		return this.makeRequest<ApplianceTrafficShaping>(
+			`/networks/${networkId}/appliance/trafficShaping`,
+		);
+	}
+
+	// Additional Wireless Management Methods
+	async getWirelessRfProfiles(networkId: string): Promise<WirelessRfProfile[]> {
+		return this.makeRequest<WirelessRfProfile[]>(
+			`/networks/${networkId}/wireless/rfProfiles`,
+		);
+	}
+
+	async getWirelessChannelUtilization(
+		networkId: string,
+		timespan = 86400,
+	): Promise<WirelessChannelUtilization[]> {
+		return this.makeRequest<WirelessChannelUtilization[]>(
+			`/networks/${networkId}/wireless/channelUtilizationHistory?timespan=${timespan}`,
+		);
+	}
+
+	async getWirelessSignalQuality(
+		networkId: string,
+		timespan = 86400,
+	): Promise<WirelessSignalQuality[]> {
+		return this.makeRequest<WirelessSignalQuality[]>(
+			`/networks/${networkId}/wireless/signalQualityHistory?timespan=${timespan}`,
+		);
+	}
+
+	async getWirelessConnectionStats(
+		networkId: string,
+		timespan = 86400,
+	): Promise<WirelessConnectionStats> {
+		return this.makeRequest<WirelessConnectionStats>(
+			`/networks/${networkId}/wireless/connectionStats?timespan=${timespan}`,
+		);
+	}
+
+	async getWirelessClientConnectivityEvents(
+		networkId: string,
+		clientId: string,
+		timespan = 86400,
+	): Promise<WirelessClientConnectivityEvent[]> {
+		return this.makeRequest<WirelessClientConnectivityEvent[]>(
+			`/networks/${networkId}/wireless/clients/${clientId}/connectivityEvents?timespan=${timespan}`,
 		);
 	}
 }

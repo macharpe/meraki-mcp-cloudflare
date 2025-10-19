@@ -7,9 +7,12 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
     "format": "biome format --write src/",
+    "pre-deploy": "./scripts/pre-deploy.sh",
+    "typecheck": "tsc --noEmit",
     "setup:secrets": "echo 'Run: wrangler secret put MERAKI_API_KEY'",
     "types": "wrangler types"
   },
@@ -37,7 +40,6 @@
   "author": "Your Name",
   "license": "GPL-3.0",
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.0.6",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "agents": "^0.0.113",
     "workers-mcp": "^0.0.13",

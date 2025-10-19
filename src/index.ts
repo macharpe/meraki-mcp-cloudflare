@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
-import { z } from "zod";
 import { handleAccessRequest } from "./access-handler";
 import { MerakiAPIService } from "./services/merakiapi";
 import type { Env } from "./types/env";
@@ -35,21 +34,103 @@ export class MerakiMCPAgent extends McpAgent<
 
 		const { pathname } = new URL(request.url);
 
-		if (pathname === "/sse" || pathname === "/sse/message") {
-			console.error(
-				`[DEBUG] Handling SSE request - using direct server response`,
-			);
-			// For now, return a simple SSE-compatible response
-			return new Response(
-				'data: {"jsonrpc":"2.0","method":"notification","params":{"type":"initialized"}}\n\n',
-				{
+		// Handle SSE endpoints for supergateway compatibility
+		if (pathname === "/sse") {
+			console.error(`[DEBUG] Handling SSE stream request`);
+
+			// For GET requests, return SSE stream
+			if (request.method === "GET") {
+				const stream = new ReadableStream({
+					start(controller) {
+						// Send initial connection message
+						controller.enqueue(
+							new TextEncoder().encode(
+								'data: {"jsonrpc":"2.0","method":"notification","params":{"type":"initialized"}}\n\n',
+							),
+						);
+
+						// Keep connection alive with periodic pings
+						const interval = setInterval(() => {
+							try {
+								controller.enqueue(new TextEncoder().encode(": ping\n\n"));
+							} catch (_e) {
+								clearInterval(interval);
+							}
+						}, 30000); // Every 30 seconds
+					},
+				});
+
+				return new Response(stream, {
 					headers: {
 						"Content-Type": "text/event-stream",
 						"Cache-Control": "no-cache",
 						Connection: "keep-alive",
+						"Access-Control-Allow-Origin": "*",
+						"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+						"Access-Control-Allow-Headers":
+							"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
 					},
-				},
-			);
+				});
+			}
+		}
+
+		if (pathname === "/sse/message") {
+			console.error(`[DEBUG] Handling SSE message POST request`);
+
+			// Handle POST requests to /sse/message (for sending MCP requests via SSE)
+			if (request.method === "POST") {
+				// This endpoint would normally handle MCP requests sent via POST
+				// and return responses that get sent over the SSE stream
+				// For now, redirect to regular MCP handling
+				const body = await request.text();
+				console.error(`[DEBUG] SSE message body:`, body);
+
+				// Process the MCP request and return JSON response
+				// This should be the same logic as the /mcp POST handler
+				try {
+					const mcpRequest = JSON.parse(body);
+					console.error(`[DEBUG] Parsed SSE MCP request:`, mcpRequest);
+
+					// Use the same MCP handling logic as /mcp endpoint
+					// For now, redirect to a simple response
+					return new Response(
+						JSON.stringify({
+							jsonrpc: "2.0",
+							id: mcpRequest.id,
+							result: { success: true, message: "SSE message received" },
+						}),
+						{
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+							},
+						},
+					);
+				} catch (error) {
+					console.error(`[ERROR] Failed to parse SSE message:`, error);
+					return new Response(
+						JSON.stringify({
+							jsonrpc: "2.0",
+							id: null,
+							error: { code: -32700, message: "Parse error" },
+						}),
+						{
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+							},
+						},
+					);
+				}
+			}
 		}
 
 		if (pathname === "/mcp") {
@@ -75,25 +156,40 @@ export class MerakiMCPAgent extends McpAgent<
 			const body = await request.text();
 			console.error(`[DEBUG] MCP request body:`, body);
 
-			// Handle GET requests (for SSE) - return SSE stream
+			// Handle GET requests - return SSE stream for SSE transport
 			if (request.method === "GET" || !body.trim()) {
-				console.error(
-					`[DEBUG] Handling GET request or empty body - returning SSE stream`,
-				);
-				return new Response(
-					'data: {"jsonrpc":"2.0","method":"notification","params":{"type":"initialized"}}\n\n',
-					{
-						headers: {
-							"Content-Type": "text/event-stream",
-							"Cache-Control": "no-cache",
-							Connection: "keep-alive",
-							"Access-Control-Allow-Origin": "*",
-							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-							"Access-Control-Allow-Headers":
-								"Content-Type, Authorization, Cache-Control",
-						},
+				// Create a proper SSE stream
+				const stream = new ReadableStream({
+					start(controller) {
+						// Send initial connection message
+						controller.enqueue(
+							new TextEncoder().encode(
+								'data: {"jsonrpc":"2.0","method":"notification","params":{"type":"initialized"}}\n\n',
+							),
+						);
+
+						// Keep connection alive with periodic pings
+						const interval = setInterval(() => {
+							try {
+								controller.enqueue(new TextEncoder().encode(": ping\n\n"));
+							} catch (_e) {
+								clearInterval(interval);
+							}
+						}, 30000); // Every 30 seconds
 					},
-				);
+				});
+
+				return new Response(stream, {
+					headers: {
+						"Content-Type": "text/event-stream",
+						"Cache-Control": "no-cache",
+						Connection: "keep-alive",
+						"Access-Control-Allow-Origin": "*",
+						"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+						"Access-Control-Allow-Headers":
+							"Content-Type, Authorization, Cache-Control",
+					},
+				});
 			}
 
 			try {
@@ -374,6 +470,128 @@ export class MerakiMCPAgent extends McpAgent<
 								required: ["serial"],
 							},
 						},
+						// Appliance Management Tools
+						{
+							name: "meraki_get_appliance_vpn_site_to_site",
+							description: "Get appliance VPN site-to-site configuration",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_appliance_content_filtering",
+							description: "Get appliance content filtering settings",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_appliance_security_events",
+							description: "Get appliance security events",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+									timespan: {
+										type: "number",
+										description: "Time span in seconds (default 86400)",
+									},
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_appliance_traffic_shaping",
+							description: "Get appliance traffic shaping settings",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+								},
+								required: ["networkId"],
+							},
+						},
+						// Additional Wireless Management Tools
+						{
+							name: "meraki_get_wireless_rf_profiles",
+							description: "Get wireless RF profiles for a network",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_wireless_channel_utilization",
+							description: "Get wireless channel utilization history",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+									timespan: {
+										type: "number",
+										description: "Time span in seconds (default 86400)",
+									},
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_wireless_signal_quality",
+							description: "Get wireless signal quality history",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+									timespan: {
+										type: "number",
+										description: "Time span in seconds (default 86400)",
+									},
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_wireless_connection_stats",
+							description: "Get wireless connection statistics",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+									timespan: {
+										type: "number",
+										description: "Time span in seconds (default 86400)",
+									},
+								},
+								required: ["networkId"],
+							},
+						},
+						{
+							name: "meraki_get_wireless_client_connectivity_events",
+							description: "Get wireless client connectivity events",
+							inputSchema: {
+								type: "object",
+								properties: {
+									networkId: { type: "string", description: "The network ID" },
+									clientId: { type: "string", description: "The client ID" },
+									timespan: {
+										type: "number",
+										description: "Time span in seconds (default 86400)",
+									},
+								},
+								required: ["networkId", "clientId"],
+							},
+						},
 					];
 
 					return createMcpResponse({
@@ -384,91 +602,62 @@ export class MerakiMCPAgent extends McpAgent<
 				}
 
 				if (mcpRequest.method === "tools/call") {
-					console.error(`[DEBUG] ========== TOOL CALL START ==========`);
-					console.error(`[DEBUG] Tool call method:`, mcpRequest.params.name);
-					console.error(
-						`[DEBUG] Tool call arguments:`,
-						JSON.stringify(mcpRequest.params.arguments),
-					);
-					console.error(`[DEBUG] Request ID:`, mcpRequest.id);
-
 					const merakiService = new MerakiAPIService(
 						this.env.MERAKI_API_KEY,
 						this.env.MERAKI_BASE_URL,
+						this.env,
 					);
 
 					try {
 						let result: unknown;
-						const startTime = Date.now();
 						switch (mcpRequest.params.name) {
 							case "meraki_get_organizations":
-								console.error(`[DEBUG] Executing meraki_get_organizations`);
 								result = await merakiService.getOrganizations();
-								console.error(
-									`[DEBUG] meraki_get_organizations completed in ${Date.now() - startTime}ms`,
-								);
-								console.error(
-									`[DEBUG] Result type:`,
-									typeof result,
-									`Array:`,
-									Array.isArray(result),
-									`Length:`,
-									Array.isArray(result) ? result.length : "N/A",
-								);
 								break;
 							case "meraki_get_organization":
-								console.error(`[DEBUG] Executing meraki_get_organization`);
 								result = await merakiService.getOrganization(
 									mcpRequest.params.arguments.organizationId,
 								);
 								break;
 							case "meraki_get_networks":
-								console.error(`[DEBUG] Executing meraki_get_networks`);
 								result = await merakiService.getNetworks(
 									mcpRequest.params.arguments.organizationId,
 								);
 								break;
 							case "meraki_get_network":
-								console.error(`[DEBUG] Executing meraki_get_network`);
 								result = await merakiService.getNetwork(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							case "meraki_get_network_traffic":
-								console.error(`[DEBUG] Executing meraki_get_network_traffic`);
 								result = await merakiService.getNetworkTraffic(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_network_events":
-								console.error(`[DEBUG] Executing meraki_get_network_events`);
 								result = await merakiService.getNetworkEvents(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.perPage,
 								);
 								break;
 							case "meraki_get_devices":
-								console.error(`[DEBUG] Executing meraki_get_devices`);
 								result = await merakiService.getDevices(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							case "meraki_get_device":
-								console.error(`[DEBUG] Executing meraki_get_device`);
 								result = await merakiService.getDevice(
 									mcpRequest.params.arguments.serial,
 								);
 								break;
 							case "meraki_get_clients":
-								console.error(`[DEBUG] Executing meraki_get_clients`);
 								result = await merakiService.getClients(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_device_statuses":
-								console.error(`[DEBUG] Executing meraki_get_device_statuses`);
 								result = await merakiService.getDeviceStatuses(
 									mcpRequest.params.arguments.organizationId,
 								);
@@ -482,7 +671,6 @@ export class MerakiMCPAgent extends McpAgent<
 								);
 								break;
 							case "meraki_get_switch_ports":
-								console.error(`[DEBUG] Executing meraki_get_switch_ports`);
 								result = await merakiService.getSwitchPorts(
 									mcpRequest.params.arguments.serial,
 								);
@@ -521,7 +709,6 @@ export class MerakiMCPAgent extends McpAgent<
 								);
 								break;
 							case "meraki_get_wireless_status":
-								console.error(`[DEBUG] Executing meraki_get_wireless_status`);
 								result = await merakiService.getWirelessStatus(
 									mcpRequest.params.arguments.serial,
 								);
@@ -534,6 +721,87 @@ export class MerakiMCPAgent extends McpAgent<
 									mcpRequest.params.arguments.serial,
 									mcpRequest.params.arguments.timespan,
 								);
+								break;
+							// Appliance Management Tools
+							case "meraki_get_appliance_vpn_site_to_site":
+								console.error(
+									`[DEBUG] Executing meraki_get_appliance_vpn_site_to_site`,
+								);
+								result = await merakiService.getApplianceVpnSiteToSite(
+									mcpRequest.params.arguments.networkId,
+								);
+								break;
+							case "meraki_get_appliance_content_filtering":
+								console.error(
+									`[DEBUG] Executing meraki_get_appliance_content_filtering`,
+								);
+								result = await merakiService.getApplianceContentFiltering(
+									mcpRequest.params.arguments.networkId,
+								);
+								break;
+							case "meraki_get_appliance_security_events":
+								console.error(
+									`[DEBUG] Executing meraki_get_appliance_security_events`,
+								);
+								result = await merakiService.getApplianceSecurityEvents(
+									mcpRequest.params.arguments.networkId,
+									mcpRequest.params.arguments.timespan,
+								);
+								break;
+							case "meraki_get_appliance_traffic_shaping":
+								console.error(
+									`[DEBUG] Executing meraki_get_appliance_traffic_shaping`,
+								);
+								result = await merakiService.getApplianceTrafficShaping(
+									mcpRequest.params.arguments.networkId,
+								);
+								break;
+							// Additional Wireless Management Tools
+							case "meraki_get_wireless_rf_profiles":
+								console.error(
+									`[DEBUG] Executing meraki_get_wireless_rf_profiles`,
+								);
+								result = await merakiService.getWirelessRfProfiles(
+									mcpRequest.params.arguments.networkId,
+								);
+								break;
+							case "meraki_get_wireless_channel_utilization":
+								console.error(
+									`[DEBUG] Executing meraki_get_wireless_channel_utilization`,
+								);
+								result = await merakiService.getWirelessChannelUtilization(
+									mcpRequest.params.arguments.networkId,
+									mcpRequest.params.arguments.timespan,
+								);
+								break;
+							case "meraki_get_wireless_signal_quality":
+								console.error(
+									`[DEBUG] Executing meraki_get_wireless_signal_quality`,
+								);
+								result = await merakiService.getWirelessSignalQuality(
+									mcpRequest.params.arguments.networkId,
+									mcpRequest.params.arguments.timespan,
+								);
+								break;
+							case "meraki_get_wireless_connection_stats":
+								console.error(
+									`[DEBUG] Executing meraki_get_wireless_connection_stats`,
+								);
+								result = await merakiService.getWirelessConnectionStats(
+									mcpRequest.params.arguments.networkId,
+									mcpRequest.params.arguments.timespan,
+								);
+								break;
+							case "meraki_get_wireless_client_connectivity_events":
+								console.error(
+									`[DEBUG] Executing meraki_get_wireless_client_connectivity_events`,
+								);
+								result =
+									await merakiService.getWirelessClientConnectivityEvents(
+										mcpRequest.params.arguments.networkId,
+										mcpRequest.params.arguments.clientId,
+										mcpRequest.params.arguments.timespan,
+									);
 								break;
 							default:
 								throw new Error(
@@ -550,36 +818,16 @@ export class MerakiMCPAgent extends McpAgent<
 								],
 							},
 						};
-						console.error(`[DEBUG] ========== TOOL CALL SUCCESS ==========`);
-						console.error(
-							`[DEBUG] Response structure:`,
-							JSON.stringify(response, null, 2),
-						);
-						console.error(
-							`[DEBUG] Response size:`,
-							JSON.stringify(response).length,
-							"characters",
-						);
-
 						const responseBody = JSON.stringify(response);
 						const finalResponse = new Response(responseBody, {
 							headers: {
 								"Content-Type": "application/json",
 								"Access-Control-Allow-Origin": "*",
 								"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-								"Access-Control-Allow-Headers": "Content-Type, Authorization",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
 							},
 						});
-
-						console.error(
-							`[DEBUG] Final response status:`,
-							finalResponse.status,
-						);
-						console.error(
-							`[DEBUG] Final response content-type:`,
-							finalResponse.headers.get("Content-Type"),
-						);
-						console.error(`[DEBUG] ========== TOOL CALL END ==========`);
 
 						return finalResponse;
 					} catch (error) {
@@ -602,7 +850,14 @@ export class MerakiMCPAgent extends McpAgent<
 								},
 							}),
 							{
-								headers: { "Content-Type": "application/json" },
+								status: 200,
+								headers: {
+									"Content-Type": "application/json",
+									"Access-Control-Allow-Origin": "*",
+									"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+									"Access-Control-Allow-Headers":
+										"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+								},
 							},
 						);
 					}
@@ -616,7 +871,14 @@ export class MerakiMCPAgent extends McpAgent<
 							result: { prompts: [] },
 						}),
 						{
-							headers: { "Content-Type": "application/json" },
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+							},
 						},
 					);
 				}
@@ -629,31 +891,96 @@ export class MerakiMCPAgent extends McpAgent<
 							result: { resources: [] },
 						}),
 						{
-							headers: { "Content-Type": "application/json" },
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+							},
 						},
 					);
 				}
 
 				if (mcpRequest.method === "notifications/initialized") {
 					// Notifications don't need a response
-					return new Response("", { status: 204 });
+					return new Response("", {
+						status: 204,
+						headers: {
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+							"Access-Control-Allow-Headers":
+								"Content-Type, Authorization, Cache-Control",
+						},
+					});
+				}
+
+				// Handle notifications (no response expected)
+				if (!mcpRequest.id && mcpRequest.method) {
+					console.error(`[DEBUG] Handling notification: ${mcpRequest.method}`);
+					return new Response("", {
+						status: 204,
+						headers: {
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+							"Access-Control-Allow-Headers":
+								"Content-Type, Authorization, Cache-Control",
+						},
+					});
+				}
+
+				// Handle other notifications that might be sent during connection
+				if (mcpRequest.method?.startsWith("notifications/")) {
+					console.error(`[DEBUG] Handling notification: ${mcpRequest.method}`);
+					return new Response("", {
+						status: 204,
+						headers: {
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+							"Access-Control-Allow-Headers":
+								"Content-Type, Authorization, Cache-Control",
+						},
+					});
 				}
 
 				// Default response for unhandled methods
 				console.error(`[DEBUG] Unhandled method: ${mcpRequest.method}`);
-				return new Response(
-					JSON.stringify({
-						jsonrpc: "2.0",
-						id: mcpRequest.id,
-						error: {
-							code: -32601,
-							message: `Method not found: ${mcpRequest.method}`,
+
+				// Only return error for requests (with ID), not notifications
+				if (mcpRequest.id !== undefined) {
+					return new Response(
+						JSON.stringify({
+							jsonrpc: "2.0",
+							id: mcpRequest.id,
+							error: {
+								code: -32601,
+								message: `Method not found: ${mcpRequest.method}`,
+							},
+						}),
+						{
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control",
+							},
 						},
-					}),
-					{
-						headers: { "Content-Type": "application/json" },
-					},
-				);
+					);
+				} else {
+					// For notifications without ID, just return 204
+					return new Response("", {
+						status: 204,
+						headers: {
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+							"Access-Control-Allow-Headers":
+								"Content-Type, Authorization, Cache-Control",
+						},
+					});
+				}
 			} catch (error) {
 				console.error(`[ERROR] MCP parsing error:`, error);
 				return new Response(
@@ -662,7 +989,14 @@ export class MerakiMCPAgent extends McpAgent<
 						error: { code: -32700, message: "Parse error" },
 					}),
 					{
-						headers: { "Content-Type": "application/json" },
+						status: 200,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+							"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+							"Access-Control-Allow-Headers":
+								"Content-Type, Authorization, Cache-Control",
+						},
 					},
 				);
 			}
@@ -672,419 +1006,7 @@ export class MerakiMCPAgent extends McpAgent<
 	}
 
 	async init() {
-		console.error(
-			`[DEBUG] MCP Agent init - MERAKI_API_KEY available: ${!!this.env.MERAKI_API_KEY}`,
-		);
-		console.error(
-			`[DEBUG] MCP Agent init - MERAKI_BASE_URL: ${this.env.MERAKI_BASE_URL}`,
-		);
-
-		const merakiService = new MerakiAPIService(
-			this.env.MERAKI_API_KEY,
-			this.env.MERAKI_BASE_URL,
-		);
-
-		// Register tools with shortened prefix to stay under 64-character limit
-		const registerTool = (
-			name: string,
-			description: string,
-			schema: unknown,
-			handler: unknown,
-		) => {
-			const metadata = {
-				title: name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-				annotations: { readOnlyHint: true },
-			};
-			const toolName = `meraki_${name}`;
-			console.error(`[DEBUG] Registering tool: ${toolName}`);
-			this.server.tool(toolName, description, schema as any, metadata, handler as any);
-		};
-
-		// Organization & Network Management Tools
-		registerTool(
-			"get_organizations",
-			"Get all Meraki organizations",
-			{},
-			async () => {
-				console.error(`[DEBUG] get_organizations called`);
-				try {
-					const orgs = await merakiService.getOrganizations();
-					console.error(
-						`[DEBUG] get_organizations success: ${JSON.stringify(orgs)}`,
-					);
-					return {
-						content: [
-							{
-								text: JSON.stringify(orgs, null, 2),
-								type: "text",
-							},
-						],
-					};
-				} catch (error) {
-					console.error(`[DEBUG] get_organizations error:`, error);
-					throw error;
-				}
-			},
-		);
-
-		registerTool(
-			"get_organization",
-			"Get details for a specific organization",
-			{ organizationId: z.string().describe("The organization ID") },
-			async ({ organizationId }: { organizationId: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getOrganization(organizationId),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_networks",
-			"Get all networks in an organization",
-			{ organizationId: z.string().describe("The organization ID") },
-			async ({ organizationId }: { organizationId: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getNetworks(organizationId),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_network",
-			"Get details for a specific network",
-			{ networkId: z.string().describe("The network ID") },
-			async ({ networkId }: { networkId: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getNetwork(networkId),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_network_traffic",
-			"Get network traffic statistics",
-			{
-				networkId: z.string().describe("The network ID"),
-				timespan: z
-					.number()
-					.optional()
-					.describe("Time span in seconds (default 86400)"),
-			},
-			async ({
-				networkId,
-				timespan,
-			}: {
-				networkId: string;
-				timespan?: number;
-			}) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getNetworkTraffic(networkId, timespan),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_network_events",
-			"Get recent network events",
-			{
-				networkId: z.string().describe("The network ID"),
-				perPage: z
-					.number()
-					.optional()
-					.describe("Number of events per page (default 10)"),
-			},
-			async ({
-				networkId,
-				perPage,
-			}: {
-				networkId: string;
-				perPage?: number;
-			}) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getNetworkEvents(networkId, perPage),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		// Device Management Tools
-		registerTool(
-			"get_devices",
-			"Get all devices in a network",
-			{ networkId: z.string().describe("The network ID") },
-			async ({ networkId }: { networkId: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getDevices(networkId),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_device",
-			"Get details for a specific device",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getDevice(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_clients",
-			"Get clients connected to a network",
-			{
-				networkId: z.string().describe("The network ID"),
-				timespan: z
-					.number()
-					.optional()
-					.describe("Time span in seconds (max 31 days)"),
-			},
-			async ({
-				networkId,
-				timespan,
-			}: {
-				networkId: string;
-				timespan?: number;
-			}) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getClients(networkId, timespan),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_device_statuses",
-			"Get device statuses for an organization",
-			{ organizationId: z.string().describe("The organization ID") },
-			async ({ organizationId }: { organizationId: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getDeviceStatuses(organizationId),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_management_interface",
-			"Get management interface settings for a device",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getManagementInterface(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		// Switch Tools
-		registerTool(
-			"get_switch_ports",
-			"Get switch ports for a device",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getSwitchPorts(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_switch_port_statuses",
-			"Get switch port statuses for a device",
-			{
-				serial: z.string().describe("The device serial number"),
-				timespan: z
-					.number()
-					.optional()
-					.describe("Time span in seconds (default 300)"),
-			},
-			async ({ serial, timespan }: { serial: string; timespan?: number }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getSwitchPortStatuses(serial, timespan),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_switch_routing_interfaces",
-			"Get routing interfaces for a switch",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getSwitchRoutingInterfaces(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_switch_static_routes",
-			"Get static routes for a switch",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getSwitchStaticRoutes(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		// Wireless Tools
-		registerTool(
-			"get_wireless_radio_settings",
-			"Get wireless radio settings for an access point",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getWirelessRadioSettings(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_wireless_status",
-			"Get wireless status of an access point",
-			{ serial: z.string().describe("The device serial number") },
-			async ({ serial }: { serial: string }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getWirelessStatus(serial),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		registerTool(
-			"get_wireless_latency_stats",
-			"Get wireless latency statistics for an access point",
-			{
-				serial: z.string().describe("The device serial number"),
-				timespan: z
-					.number()
-					.optional()
-					.describe("Time span in seconds (default 86400)"),
-			},
-			async ({ serial, timespan }: { serial: string; timespan?: number }) => ({
-				content: [
-					{
-						text: JSON.stringify(
-							await merakiService.getWirelessLatencyStats(serial, timespan),
-							null,
-							2,
-						),
-						type: "text",
-					},
-				],
-			}),
-		);
-
-		console.error(`[DEBUG] MCP Agent init completed successfully`);
+		// Initialize MCP server - tool handling is done via direct JSON-RPC in fetch()
 	}
 }
 
@@ -1125,6 +1047,63 @@ async function mainHandler(
 	console.error(`[DEBUG] mainHandler: ${request.method} ${pathname}`);
 	console.error(`[DEBUG] env.MCP_OBJECT available:`, !!env.MCP_OBJECT);
 
+	// Handle OAuth discovery endpoints
+	if (pathname === "/.well-known/oauth-authorization-server") {
+		console.error(`[DEBUG] OAuth discovery endpoint requested`);
+		const baseUrl = new URL(request.url).origin;
+
+		const discoveryMetadata = {
+			issuer: baseUrl,
+			authorization_endpoint: `${baseUrl}/authorize`,
+			token_endpoint: `${baseUrl}/token`,
+			jwks_uri: `${baseUrl}/.well-known/jwks.json`,
+			registration_endpoint: `${baseUrl}/register`,
+			scopes_supported: ["meraki:read", "meraki:write"],
+			response_types_supported: ["code"],
+			response_modes_supported: ["query"],
+			grant_types_supported: ["authorization_code", "refresh_token"],
+			token_endpoint_auth_methods_supported: [
+				"client_secret_post",
+				"client_secret_basic",
+			],
+			code_challenge_methods_supported: ["S256"],
+			subject_types_supported: ["public"],
+			id_token_signing_alg_values_supported: ["RS256"],
+			claims_supported: ["sub", "aud", "iss", "iat", "exp", "email", "name"],
+			// MCP-specific metadata
+			mcp_server_info: {
+				name: "Cisco Meraki MCP Server",
+				version: "1.0.0",
+				tools_count: 27,
+			},
+		};
+
+		return new Response(JSON.stringify(discoveryMetadata, null, 2), {
+			headers: {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+				"Cache-Control": "public, max-age=3600",
+			},
+		});
+	}
+
+	if (pathname === "/.well-known/jwks.json") {
+		console.error(`[DEBUG] JWKS endpoint requested`);
+		// For now, return empty JWKS since we're using Cloudflare Access tokens
+		// In a full implementation, this would contain the public keys for token verification
+		const jwks = {
+			keys: [],
+		};
+
+		return new Response(JSON.stringify(jwks, null, 2), {
+			headers: {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+				"Cache-Control": "public, max-age=3600",
+			},
+		});
+	}
+
 	// Handle CORS preflight requests for MCP endpoints
 	if (
 		request.method === "OPTIONS" &&
@@ -1137,7 +1116,7 @@ async function mainHandler(
 				"Access-Control-Allow-Origin": "*",
 				"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 				"Access-Control-Allow-Headers":
-					"Content-Type, Authorization, Cache-Control",
+					"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
 				"Access-Control-Max-Age": "86400", // 24 hours
 			},
 		});
@@ -1153,11 +1132,7 @@ async function mainHandler(
 	}
 
 	// All other routes go through OAuth handling
-	return handleAccessRequest(
-		request,
-		env as any,
-		ctx,
-	);
+	return handleAccessRequest(request, env as any, ctx);
 }
 
 export default {

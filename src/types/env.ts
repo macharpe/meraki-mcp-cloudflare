@@ -10,8 +10,16 @@ export interface Env {
 	ACCESS_JWKS_URL: string;
 	COOKIE_ENCRYPTION_KEY: string;
 
+	// Cache TTL configuration (optional)
+	CACHE_TTL_ORGANIZATIONS?: string;
+	CACHE_TTL_NETWORKS?: string;
+	CACHE_TTL_JWKS?: string;
+
 	// KV namespace for OAuth session storage
 	OAUTH_KV: KVNamespace;
+
+	// KV namespace for API response caching
+	CACHE_KV: KVNamespace;
 
 	// Durable Object binding for MCP Agent
 	MCP_OBJECT: DurableObjectNamespace;

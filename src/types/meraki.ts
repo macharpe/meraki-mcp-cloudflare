@@ -306,3 +306,146 @@ export interface NetworkEvent {
 	ssidNumber?: number;
 	eventData?: Record<string, unknown>;
 }
+
+// Appliance Management Types
+export interface ApplianceVpnSiteToSite {
+	mode: "none" | "hub" | "spoke";
+	hubs?: Array<{
+		hubId: string;
+		useDefaultRoute: boolean;
+	}>;
+	subnets?: Array<{
+		localSubnet: string;
+		useVpn: boolean;
+	}>;
+}
+
+export interface ApplianceContentFiltering {
+	allowedUrlPatterns?: string[];
+	blockedUrlPatterns?: string[];
+	blockedUrlCategories?: string[];
+	urlCategoryListSize?: string;
+}
+
+export interface ApplianceSecurityEvent {
+	ts: string;
+	eventType: string;
+	srcIp: string;
+	destIp: string;
+	protocol?: string;
+	port?: number;
+	blocked: boolean;
+	ruleId?: string;
+	message?: string;
+}
+
+export interface ApplianceTrafficShaping {
+	globalBandwidthLimits?: {
+		limitUp?: number;
+		limitDown?: number;
+	};
+	rules?: Array<{
+		definitions: Array<{
+			type: string;
+			value: string;
+		}>;
+		perClientBandwidthLimits?: {
+			bandwidthLimits: {
+				limitUp?: number;
+				limitDown?: number;
+			};
+			settings: string;
+		};
+		dscpTagValue?: number;
+		priority?: string;
+	}>;
+}
+
+// Additional Wireless Management Types
+export interface WirelessRfProfile {
+	id: string;
+	networkId: string;
+	name: string;
+	clientBalancingEnabled?: boolean;
+	minBitrateType: string;
+	bandSelectionType: string;
+	apBandSettings?: {
+		bandOperationMode: string;
+		bands?: {
+			enabled?: string[];
+		};
+	};
+	twoFourGhzSettings?: {
+		maxPower?: number;
+		minPower?: number;
+		minBitrate?: number;
+		validAutoChannels?: number[];
+		axEnabled?: boolean;
+		rxsop?: number;
+	};
+	fiveGhzSettings?: {
+		maxPower?: number;
+		minPower?: number;
+		minBitrate?: number;
+		validAutoChannels?: number[];
+		channelWidth?: string;
+		rxsop?: number;
+	};
+	sixGhzSettings?: {
+		maxPower?: number;
+		minPower?: number;
+		minBitrate?: number;
+		validAutoChannels?: number[];
+		channelWidth?: string;
+		rxsop?: number;
+	};
+	transmission?: {
+		enabled: boolean;
+	};
+	perSsidSettings?: {
+		[key: string]: {
+			minBitrate?: number;
+			bandOperationMode?: string;
+			bands?: {
+				enabled?: string[];
+			};
+		};
+	};
+}
+
+export interface WirelessChannelUtilization {
+	startTs: string;
+	endTs: string;
+	utilizationTotal: number;
+	utilization80211: number;
+	utilizationNon80211: number;
+}
+
+export interface WirelessSignalQuality {
+	startTs: string;
+	endTs: string;
+	rssi: number;
+	snr: number;
+}
+
+export interface WirelessConnectionStats {
+	assoc: number;
+	auth: number;
+	dhcp: number;
+	dns: number;
+	success: number;
+}
+
+export interface WirelessClientConnectivityEvent {
+	occurredAt: string;
+	deviceSerial: string;
+	band: number;
+	ssidNumber: number;
+	type: string;
+	details?: {
+		rssi?: number;
+		aid?: string;
+		duration?: string;
+	};
+	eventData?: Record<string, unknown>;
+}
