@@ -114,7 +114,7 @@ export function createOAuthHelpers(env: Env): OAuthHelpers {
 					scope: client.scope || "meraki:read",
 				};
 			} catch (error) {
-				console.error(`Error looking up client ${clientId}:`, error);
+				console.error("Error looking up client:", clientId, error);
 				// Return basic info on error
 				return {
 					clientId,

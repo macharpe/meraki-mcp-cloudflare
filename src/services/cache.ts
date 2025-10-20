@@ -36,14 +36,14 @@ export class CacheService {
 			const cached = await this.kv.get(cacheKey, "json");
 
 			if (cached) {
-				console.log(`[CACHE] Hit for key: ${cacheKey}`);
+				console.log("[CACHE] Hit for key:", cacheKey);
 				return cached as T;
 			}
 
-			console.log(`[CACHE] Miss for key: ${cacheKey}`);
+			console.log("[CACHE] Miss for key:", cacheKey);
 			return null;
 		} catch (error) {
-			console.error(`[CACHE] Error getting key ${key}:`, error);
+			console.error("[CACHE] Error getting key:", key, error);
 			return null;
 		}
 	}
@@ -64,9 +64,9 @@ export class CacheService {
 				expirationTtl: ttl,
 			});
 
-			console.log(`[CACHE] Set key: ${cacheKey} (TTL: ${ttl}s)`);
+			console.log("[CACHE] Set key:", cacheKey, "(TTL:", `${ttl}s)`);
 		} catch (error) {
-			console.error(`[CACHE] Error setting key ${key}:`, error);
+			console.error("[CACHE] Error setting key:", key, error);
 		}
 	}
 
@@ -81,9 +81,9 @@ export class CacheService {
 		try {
 			const cacheKey = this.getCacheKey(key, options?.namespace);
 			await this.kv.delete(cacheKey);
-			console.log(`[CACHE] Deleted key: ${cacheKey}`);
+			console.log("[CACHE] Deleted key:", cacheKey);
 		} catch (error) {
-			console.error(`[CACHE] Error deleting key ${key}:`, error);
+			console.error("[CACHE] Error deleting key:", key, error);
 		}
 	}
 
@@ -107,7 +107,7 @@ export class CacheService {
 			await this.set(key, result, options);
 			return result;
 		} catch (error) {
-			console.error(`[CACHE] Error in getOrSet for key ${key}:`, error);
+			console.error("[CACHE] Error in getOrSet for key:", key, error);
 			throw error;
 		}
 	}
