@@ -826,6 +826,7 @@ export class MerakiMCPAgent extends McpAgent<
 								"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 								"Access-Control-Allow-Headers":
 									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+								"X-Cache-Status": merakiService.cacheStatus, // Track cache hit/miss for monitoring
 							},
 						});
 
@@ -1082,7 +1083,7 @@ async function mainHandler(
 			headers: {
 				"Content-Type": "application/json",
 				"Access-Control-Allow-Origin": "*",
-				"Cache-Control": "public, max-age=3600",
+				"Cache-Control": "public, max-age=3600, s-maxage=3600", // 1 hour browser + edge cache
 			},
 		});
 	}
@@ -1099,7 +1100,7 @@ async function mainHandler(
 			headers: {
 				"Content-Type": "application/json",
 				"Access-Control-Allow-Origin": "*",
-				"Cache-Control": "public, max-age=3600",
+				"Cache-Control": "public, max-age=3600, s-maxage=3600", // 1 hour browser + edge cache
 			},
 		});
 	}
