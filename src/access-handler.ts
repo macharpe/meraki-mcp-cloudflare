@@ -235,6 +235,7 @@ export async function handleAccessRequest(
 				headers: {
 					"Content-Type": "application/json",
 					"Access-Control-Allow-Origin": "*",
+					"Cache-Control": "public, max-age=300, s-maxage=600", // 5min browser, 10min edge
 				},
 			},
 		);

@@ -34,6 +34,7 @@ export class MerakiAPIService {
 	private baseUrl: string;
 	private cache: CacheService | null;
 	private env: Env | null;
+	public cacheStatus: "HIT" | "MISS" = "MISS"; // Track last cache status for monitoring
 
 	constructor(
 		apiKey: string,
@@ -89,11 +90,14 @@ export class MerakiAPIService {
 	// Organizations
 	async getOrganizations(): Promise<Organization[]> {
 		if (this.cache && this.env) {
-			return this.cache.getOrSet(
+			// Use Workers Cache API for maximum performance
+			const result = await this.cache.getWithWorkersCache(
 				CacheKeys.organizations(),
 				() => this.makeRequest<Organization[]>("/organizations"),
 				{ ttl: CacheTTL.ORGANIZATIONS(this.env) },
 			);
+			this.cacheStatus = result.cacheStatus;
+			return result.data;
 		}
 		return this.makeRequest<Organization[]>("/organizations");
 	}
@@ -105,7 +109,8 @@ export class MerakiAPIService {
 	// Networks
 	async getNetworks(organizationId: string): Promise<Network[]> {
 		if (this.cache && this.env) {
-			return this.cache.getOrSet(
+			// Use Workers Cache API for maximum performance
+			const result = await this.cache.getWithWorkersCache(
 				CacheKeys.networks(organizationId),
 				() =>
 					this.makeRequest<Network[]>(
@@ -113,6 +118,8 @@ export class MerakiAPIService {
 					),
 				{ ttl: CacheTTL.NETWORKS(this.env) },
 			);
+			this.cacheStatus = result.cacheStatus;
+			return result.data;
 		}
 		return this.makeRequest<Network[]>(
 			`/organizations/${organizationId}/networks`,

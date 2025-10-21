@@ -10,10 +10,12 @@ export class CacheService {
 	private kv: KVNamespace;
 	private defaultTtl: number = 300; // 5 minutes default
 	private env: Env;
+	private workersCache: Cache;
 
 	constructor(env: Env) {
 		this.kv = env.CACHE_KV;
 		this.env = env;
+		this.workersCache = (caches as any).default as Cache;
 	}
 
 	/**
@@ -109,6 +111,77 @@ export class CacheService {
 		} catch (error) {
 			console.error("[CACHE] Error in getOrSet for key:", key, error);
 			throw error;
+		}
+	}
+
+	/**
+	 * Workers Cache API layer - faster than KV for frequently accessed data
+	 * Provides two-tier caching: Workers Cache (edge) -> KV (persistent)
+	 */
+	async getWithWorkersCache<T>(
+		key: string,
+		fetchFunction: () => Promise<T>,
+		options?: CacheOptions,
+	): Promise<{ data: T; cacheStatus: "HIT" | "MISS" }> {
+		const cacheKey = new Request(
+			`https://cache.internal/${this.getCacheKey(key, options?.namespace)}`,
+		);
+
+		try {
+			// Layer 1: Try Workers Cache API first (fastest - sub-millisecond)
+			const cachedResponse = await this.workersCache.match(cacheKey);
+			if (cachedResponse) {
+				const data = (await cachedResponse.json()) as T;
+				console.log("[WORKERS_CACHE] HIT for key:", key);
+				return { data, cacheStatus: "HIT" };
+			}
+
+			console.log("[WORKERS_CACHE] MISS for key:", key);
+
+			// Layer 2: Try KV cache (medium speed - 10-50ms)
+			const kvCached = await this.get<T>(key, options);
+			if (kvCached !== null) {
+				console.log("[KV_CACHE] HIT for key:", key);
+
+				// Store in Workers Cache for next request (non-blocking)
+				const response = new Response(JSON.stringify(kvCached), {
+					headers: {
+						"Content-Type": "application/json",
+						"Cache-Control": `max-age=${options?.ttl || this.defaultTtl}`,
+					},
+				});
+				await this.workersCache.put(cacheKey, response);
+
+				return { data: kvCached, cacheStatus: "MISS" };
+			}
+
+			console.log("[KV_CACHE] MISS for key:", key);
+
+			// Layer 3: Complete cache miss - fetch from origin (slowest)
+			const result = await fetchFunction();
+
+			// Store in both caches (non-blocking for Workers Cache)
+			const ttl = options?.ttl || this.defaultTtl;
+			await this.set(key, result, options); // Store in KV
+
+			const response = new Response(JSON.stringify(result), {
+				headers: {
+					"Content-Type": "application/json",
+					"Cache-Control": `max-age=${ttl}`,
+				},
+			});
+			await this.workersCache.put(cacheKey, response); // Store in Workers Cache
+
+			return { data: result, cacheStatus: "MISS" };
+		} catch (error) {
+			console.error(
+				"[CACHE] Error in getWithWorkersCache for key:",
+				key,
+				error,
+			);
+			// Fallback to direct fetch on cache error
+			const result = await fetchFunction();
+			return { data: result, cacheStatus: "MISS" };
 		}
 	}
 }
