@@ -60,7 +60,6 @@ flowchart TD
     G[Cache Strategy] --> H[Organizations: 30min TTL]
     G --> I[Networks: 15min TTL]
     G --> J[Clients: 5min TTL]
-    G --> K[JWKS Keys: 1hr TTL]
 
     L[Benefits] --> M[💰 Reduced API costs]
     L --> N[🚀 Faster responses]
@@ -74,7 +73,6 @@ flowchart TD
 - **TTL Configuration**: Environment variables for configurable cache timeouts
   - `CACHE_TTL_ORGANIZATIONS`: Default 1800 seconds (30 minutes)
   - `CACHE_TTL_NETWORKS`: Default 900 seconds (15 minutes)
-  - `CACHE_TTL_JWKS`: Default 3600 seconds (1 hour)
 - **Graceful Fallback**: If KV unavailable, falls back to direct API calls
 - **Global Replication**: Cached across all Cloudflare edge locations
 - **Pagination Support**: Automatically handles large datasets (e.g., client lists)
@@ -90,23 +88,25 @@ flowchart TD
 
 ### 🔒 Security Considerations
 
-**Current Model (API Key):**
+**Current Architecture:**
 
 - ✅ Simple and direct access
 - ✅ No OAuth complexity
 - ✅ Works with all MCP clients immediately
+- ✅ API key securely stored in Worker secrets (encrypted)
+- ✅ Edge security via Cloudflare's network (DDoS, WAF)
+- ✅ HTTPS-only connections (TLS 1.3)
+- ⚠️ MCP endpoints are publicly accessible (no user authentication)
 - ⚠️ All users share the same Meraki API key
-- ⚠️ No per-user access control
-- ⚠️ No audit logging of which user made which request
+- ⚠️ No per-user access control or audit logging
 
-**Alternative Model (OAuth 2.1 + Cloudflare Access):**
+**Deployment Best Practices:**
 
-- ✅ Per-user authentication via enterprise SSO
-- ✅ User-level access control and audit logging
-- ✅ Cloudflare Access policy enforcement
-- ⚠️ More complex setup and configuration
-- ⚠️ Requires user authentication before MCP access
-- ⚠️ May not work with all MCP clients
+- Use custom domain (avoid public workers.dev URLs)
+- Keep Meraki API key restricted to minimum required permissions
+- Monitor Worker logs for unusual activity
+- Consider rate limiting at the Worker level if needed
+- Regularly rotate Meraki API keys
 
 ## Endpoints Summary
 
@@ -114,26 +114,7 @@ flowchart TD
 |----------|---------|---------------|---------|
 | `/mcp` | MCP JSON-RPC endpoint | No (public) | GET/POST |
 | `/sse` | Server-Sent Events transport | No (public) | GET |
-| `/health` | Health check with endpoint list | No (public) | GET |
-| `/.well-known/oauth-authorization-server` | OAuth discovery metadata (for future use) | No (public) | GET |
-| `/.well-known/jwks.json` | Public keys for token verification (for future use) | No (public) | GET |
-| `/register` | Dynamic client registration (for future use) | No (public) | POST |
-| `/authorize` | OAuth authorization endpoint (for future use) | No (public) | GET |
-| `/callback` | OAuth callback handler (for future use) | No (public) | GET |
-| `/token` | Token exchange endpoint (for future use) | No (public) | POST |
-
-## OAuth Infrastructure (Available but Not Active)
-
-The codebase includes OAuth 2.1 + PKCE infrastructure in `src/oauth-helpers.ts` and `src/access-handler.ts`, but it is **not currently protecting MCP endpoints**.
-
-This infrastructure can be activated in the future if you need:
-
-- Per-user authentication and authorization
-- Enterprise SSO integration via Cloudflare Access for SaaS
-- User-level audit logging
-- Fine-grained access control
-
-To activate OAuth protection, the routing logic in `src/index.ts` would need to be modified to route `/mcp` requests through `handleAccessRequest()` instead of `handleMcpRequest()` directly.
+| `/health` | Health check | No (public) | GET |
 
 ## Error Handling
 
@@ -151,24 +132,13 @@ flowchart TD
     E -->|API Error| J[Return formatted error]
 ```
 
-## Benefits of Current Architecture
+## Architecture Benefits
 
-1. **🚀 Simplicity**: Direct MCP access without OAuth complexity
+1. **🚀 Simplicity**: Direct MCP access without authentication complexity
 2. **⚡ Performance**: Global edge deployment with intelligent KV caching (10-50x faster responses)
 3. **💰 Cost Optimization**: Reduced Meraki API calls and Worker execution time through caching
 4. **🔧 Rate Limit Protection**: Cache prevents hitting Meraki's 5 requests/second limit
-5. **🌐 Universal Compatibility**: Works with all MCP clients (Claude Desktop, Playground, custom clients)
-6. **📊 Observability**: Comprehensive logging and monitoring
+5. **🌐 Universal Compatibility**: Works with all MCP clients (Claude Desktop, Claude Code, Claude.ai, AI Playground)
+6. **📊 Observability**: Comprehensive logging via `wrangler tail`
 7. **🔄 Scalability**: Serverless architecture with automatic scaling
-8. **🔓 Easy Setup**: No OAuth configuration required - just add the MCP server URL
-
-## Future Enhancement: Cloudflare Access Integration
-
-If enterprise-grade per-user authentication is needed in the future, the OAuth infrastructure can be activated by:
-
-1. Configuring Cloudflare Access for SaaS application
-2. Setting up identity provider (Okta, Google Workspace, etc.)
-3. Modifying routing logic to protect `/mcp` endpoints
-4. Configuring Access policies for user/group authorization
-
-See the Cloudflare documentation for [Securing MCP servers with Access for SaaS](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/saas-apps/mcp-server/) for implementation details.
+8. **🔓 Easy Setup**: No authentication configuration required - just add the MCP server URL

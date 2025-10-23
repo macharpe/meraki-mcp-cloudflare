@@ -9,9 +9,9 @@
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/macharpe/meraki-mcp-cloudflare)
 
-A production-ready, optimized Model Context Protocol (MCP) server that provides AI assistants with comprehensive access to Cisco Meraki network management capabilities. Built on Cloudflare Workers with Durable Objects, OAuth 2.1 authentication with PKCE, KV caching, and full OAuth discovery support.
+A production-ready, optimized Model Context Protocol (MCP) server that provides AI assistants with comprehensive access to Cisco Meraki network management capabilities. Built on Cloudflare Workers with Durable Objects and intelligent KV caching for optimal performance.
 
-> **Prerequisites**: Requires a Cloudflare account and domain for custom domain setup and OAuth authentication.
+> **Prerequisites**: Requires a Cloudflare account and a Cisco Meraki API key.
 
 > **Inspiration**: This implementation was inspired by [Censini/mcp-server-meraki](https://github.com/Censini/mcp-server-meraki) and [mkutka/meraki-magic-mcp](https://github.com/mkutka/meraki-magic-mcp) - credits to both original works for API method ideas and implementation approaches.
 
@@ -63,31 +63,23 @@ The server provides **27 comprehensive Meraki management tools** organized acros
 - **`get_appliance_security_events`** - Get security events
 - **`get_appliance_traffic_shaping`** - Get traffic shaping settings
 
-### 🎯 Key Benefits
-
-- 🚀 **Enterprise-Ready**: Production deployment on Cloudflare Workers with Durable Objects
-- 🔒 **OAuth 2.1 + PKCE**: Advanced security with Cloudflare Access for SaaS integration
-- 🔍 **OAuth Discovery**: Full RFC-compliant discovery endpoints for automated client configuration
-- 🌐 **Custom Domain**: Professional branded domain with SSL (`meraki-mcp.macharpe.com`)
-- 📱 **Real-time**: Live access to your Meraki dashboard data via REST API
-- 💰 **Cost-effective**: Serverless architecture with pay-per-use pricing
-- ⚡ **High Performance**: Global edge deployment with sub-100ms response times
-- 🛡️ **MCP Portal Compatible**: Works seamlessly with Cloudflare MCP Portals
-
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   MCP Client    │    │  Durable Object  │    │  Meraki API     │
-│   (Claude)      │◄──►│  MCP Agent       │◄──►│  Dashboard      │
-│                 │    │  + OAuth Handler │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-    OAuth 2.0 Flow       Cloudflare Workers     HTTPS/REST API
-         ▲                      ▲
-         └──────────────────────┘
-           Cloudflare Access
-           (Identity Provider)
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│   MCP Client    │         │  Durable Object  │         │  Meraki API     │
+│   (Claude)      │◄───────►│  MCP Agent       │◄───────►│  Dashboard      │
+│                 │         │  (Stateful)      │         │                 │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+   HTTP/SSE                   Cloudflare Workers          HTTPS/REST API
+   JSON-RPC 2.0               + KV Cache Layer            + API Key Auth
 ```
+
+**Components:**
+- **MCP Client**: Any MCP-compatible client (Claude Desktop, Claude Code, Claude.ai, AI Playground)
+- **Durable Object MCP Agent**: Stateful server handling MCP protocol and tool execution
+- **KV Cache Layer**: Intelligent caching for organizations, networks, and client data
+- **Meraki API**: Cisco Meraki Dashboard API v1 with API key authentication
 
 ## ⚡ Performance & Caching
 
@@ -98,15 +90,7 @@ The server implements intelligent KV caching to optimize performance and reduce 
 - **Organization Lists**: Cached for 30 minutes - organizations rarely change
 - **Network Lists**: Cached for 15 minutes - moderate update frequency
 - **Client Lists**: Cached for 5 minutes - clients connect/disconnect frequently
-- **JWKS Keys**: Cached for 1 hour - JWT verification keys are stable
 - **Graceful Fallback**: All methods work without cache if KV unavailable
-
-### 📊 Cache Benefits
-
-- **🚀 Faster Response Times**: Cached data returns in milliseconds vs. API roundtrip
-- **💰 Cost Optimization**: Reduced Meraki API calls and Cloudflare Worker execution time
-- **🔧 Rate Limit Protection**: Prevents hitting Meraki's 5 requests/second limit
-- **🌐 Global Performance**: Edge caching across Cloudflare's global network
 
 ### 🎛️ Cache Configuration
 
@@ -116,60 +100,39 @@ Cache TTL values are configurable through environment variables:
 # Optional - Cache time-to-live settings (in seconds)
 npx wrangler secret put CACHE_TTL_ORGANIZATIONS  # Default: 1800 (30 min)
 npx wrangler secret put CACHE_TTL_NETWORKS       # Default: 900 (15 min)
-npx wrangler secret put CACHE_TTL_JWKS          # Default: 3600 (1 hour)
 ```
 
 **Cache Storage**: Uses Cloudflare KV with automatic expiration and global replication.
 
 ## 🔐 Authentication
 
-The server uses **Meraki API key authentication** for simplicity and universal compatibility with all MCP clients.
+The server uses **simple Meraki API key authentication** - no OAuth configuration required.
 
-> 📋 **Detailed Flow**: See [`docs/authentication-flow.md`](docs/authentication-flow.md) for the complete authentication architecture diagram.
+### 🔑 How It Works
 
-### 🔑 API Key Authentication
+1. **MCP Endpoints**: Publicly accessible at `/mcp` and `/sse` (no authentication required)
+2. **Meraki API Authentication**: Server uses `MERAKI_API_KEY` Worker secret to authenticate with Meraki Dashboard
+3. **Client Setup**: Simply add the MCP server URL to your client - no tokens, no OAuth flow
 
-- **MCP Endpoints**: Publicly accessible (no OAuth required)
-- **Meraki API Authentication**: Uses `MERAKI_API_KEY` Worker secret
-- **Universal Compatibility**: Works with all MCP clients (Claude Desktop, Cloudflare AI Playground, custom clients)
-- **Simple Setup**: Just add the MCP server URL - no OAuth configuration needed
-
-**Current Architecture:**
+**Architecture:**
 ```
-MCP Client → Worker (public /mcp endpoint) → Meraki API (with API key)
+MCP Client → /mcp endpoint (public) → Meraki API (authenticated with API key)
 ```
-
-### 🔍 Optional OAuth Infrastructure (Not Active)
-
-The codebase includes OAuth 2.1 + PKCE infrastructure for **future enterprise use** if per-user authentication is needed:
-
-| Endpoint | Status | Purpose |
-|----------|--------|---------|
-| `/.well-known/oauth-authorization-server` | Available | OAuth metadata discovery (RFC 8414) |
-| `/.well-known/jwks.json` | Available | JSON Web Key Set (RFC 7517) |
-| `/register` | Available | Dynamic client registration (RFC 7591) |
-| `/authorize` | Available | OAuth authorization endpoint |
-| `/token` | Available | Token exchange endpoint |
-
-> ⚠️ **Note**: These OAuth endpoints exist in the code but are **not protecting MCP endpoints**. They can be activated in the future for enterprise SSO if needed.
 
 ### 🛡️ Security Features
 
-- **Meraki API Key**: Secure Worker secret storage
-- **Edge Security**: Cloudflare's global network protection
-- **Rate Limiting**: KV caching prevents API abuse
-- **HTTPS Only**: All traffic encrypted in transit
-- **Custom Domain**: No public workers.dev URLs (security best practice)
+- **API Key Protection**: Meraki API key stored as encrypted Cloudflare Worker secret (never exposed to clients)
+- **Edge Security**: Cloudflare's global network provides DDoS protection and WAF
+- **Rate Limiting**: KV caching reduces API calls and prevents abuse
+- **HTTPS Only**: All traffic encrypted in transit with TLS 1.3
+- **No Credentials in Client**: MCP clients don't need any authentication - server handles all Meraki API calls
 
 ### 📁 Project Structure
 
 ```text
 meraki-mcp-cloudflare/
 ├── src/
-│   ├── index.ts              # Main Durable Object MCP Agent
-│   ├── access-handler.ts     # OAuth authentication handler
-│   ├── oauth-helpers.ts      # OAuth utility functions
-│   ├── workers-oauth-utils.ts# Workers OAuth utilities
+│   ├── index.ts              # Main Durable Object MCP Agent & request handler
 │   ├── services/
 │   │   ├── merakiapi.ts      # Meraki API service layer
 │   │   └── cache.ts          # KV caching service
@@ -179,13 +142,12 @@ meraki-mcp-cloudflare/
 │   └── tests/
 │       └── index.test.ts     # Test files
 ├── docs/
-│   └── authentication-flow.md# OAuth flow documentation
+│   └── README.md             # Documentation
 ├── scripts/
 │   └── pre-deploy.sh         # Pre-deployment checks
 ├── wrangler.jsonc            # Cloudflare Workers configuration
 ├── package.json              # Dependencies and scripts
-├── CLAUDE.md                 # Claude Code instructions
-└── README.md                 # This file
+└── README.md                 # Main README
 ```
 
 ## 📋 Prerequisites
@@ -314,22 +276,16 @@ npx wrangler kv:namespace create "CACHE_KV"
 
 Update both namespace IDs in `wrangler.jsonc` with the returned IDs.
 
-### 6. Set Required Secrets
+### 6. Set Required Secret
 
-Set your API key and OAuth configuration as secrets:
+Set your Meraki API key as a Worker secret:
 
 ```bash
 # Required - Meraki API key
 npx wrangler secret put MERAKI_API_KEY
-
-# Required - OAuth configuration secrets
-npx wrangler secret put ACCESS_CLIENT_ID
-npx wrangler secret put ACCESS_CLIENT_SECRET
-npx wrangler secret put ACCESS_TOKEN_URL
-npx wrangler secret put ACCESS_AUTHORIZATION_URL
-npx wrangler secret put ACCESS_JWKS_URL
-npx wrangler secret put COOKIE_ENCRYPTION_KEY
 ```
+
+When prompted, paste your Meraki API key.
 
 ### 7. Deploy to Cloudflare Workers
 
@@ -347,9 +303,9 @@ npx wrangler deploy
 
 Your server will be available at: `https://meraki-mcp.yourdomain.com`
 
-## ⚙️ Claude Desktop Configuration
+## ⚙️ Claude Configuration
 
-### 💻 Setup Instructions
+### 💻 Claude Desktop
 
 1. **Locate your Claude Desktop config file**:
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -365,27 +321,48 @@ Your server will be available at: `https://meraki-mcp.yourdomain.com`
       "args": [
         "-y",
         "mcp-remote@latest",
-        "https://meraki-mcp.yourdomain.com"
+        "https://meraki-mcp.yourdomain.com/mcp"
       ]
     }
   }
 }
 ```
 
-3. **Replace with your actual values**:
-   - `yourdomain.com` → Your actual domain configured in Cloudflare
+3. **Replace `yourdomain.com`** with your actual domain configured in Cloudflare
 
 4. **Restart Claude Desktop** completely (quit and relaunch)
 
-### ✅ Verify Configuration
+5. **Test**: Try "List my Meraki organizations" in a new conversation
 
-Check that the server is properly connected:
+### 🖥️ Claude Code (CLI)
 
-1. Open Claude Desktop
-2. Start a new conversation
-3. Try: "List my Meraki organizations"
+Add the server using the CLI:
 
-The server should respond immediately with your Meraki organization data.
+```bash
+claude mcp add --transport http meraki-mcp https://meraki-mcp.yourdomain.com/mcp
+```
+
+Or manually add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "meraki-mcp": {
+      "url": "https://meraki-mcp.yourdomain.com/mcp",
+      "transport": "http"
+    }
+  }
+}
+```
+
+### 🌐 Claude.ai (Web)
+
+1. Go to [Claude.ai](https://claude.ai)
+2. Click the MCP servers icon (puzzle piece)
+3. Click "Add Server"
+4. Enter your server URL: `https://meraki-mcp.yourdomain.com/mcp`
+5. Click "Add" - no authentication needed
+6. Start using Meraki tools in your conversations
 
 ## 🌍 Environment Variables
 
@@ -405,33 +382,6 @@ Configure cache TTL values to optimize performance:
 
 - **`CACHE_TTL_ORGANIZATIONS`** - Cache TTL for organization lists in seconds (default: 1800 / 30 minutes)
 - **`CACHE_TTL_NETWORKS`** - Cache TTL for network lists in seconds (default: 900 / 15 minutes)
-- **`CACHE_TTL_JWKS`** - Cache TTL for JWKS keys in seconds (default: 3600 / 1 hour)
-
-### OAuth Configuration (Optional - Not Active)
-
-These environment variables are for future OAuth functionality if needed:
-
-- **`ACCESS_CLIENT_ID`** - OAuth client ID from Cloudflare Access (not currently used)
-- **`ACCESS_CLIENT_SECRET`** - OAuth client secret from Cloudflare Access (not currently used)
-- **`ACCESS_TOKEN_URL`** - OAuth token endpoint URL (not currently used)
-- **`ACCESS_AUTHORIZATION_URL`** - OAuth authorization endpoint URL (not currently used)
-- **`ACCESS_JWKS_URL`** - JWKS endpoint for token verification (not currently used)
-- **`COOKIE_ENCRYPTION_KEY`** - Key for encrypting session cookies (not currently used)
-
-### Setting Secrets
-
-```bash
-# Required - Meraki API authentication
-npx wrangler secret put MERAKI_API_KEY
-
-# Optional - Only if activating OAuth in the future
-# npx wrangler secret put ACCESS_CLIENT_ID
-# npx wrangler secret put ACCESS_CLIENT_SECRET
-# npx wrangler secret put ACCESS_TOKEN_URL
-# npx wrangler secret put ACCESS_AUTHORIZATION_URL
-# npx wrangler secret put ACCESS_JWKS_URL
-# npx wrangler secret put COOKIE_ENCRYPTION_KEY
-```
 
 ## 💡 Usage Examples
 
@@ -497,62 +447,8 @@ curl https://meraki-mcp.macharpe.com/health
   "status": "OK",
   "service": "Cisco Meraki MCP Server",
   "timestamp": "2025-01-23T10:30:00.000Z",
-  "oauthEnabled": true,
-  "version": "1.0.0",
-  "endpoints": [
-    "/mcp",
-    "/sse",
-    "/health",
-    "/authorize",
-    "/callback",
-    "/token",
-    "/register",
-    "/.well-known/oauth-authorization-server",
-    "/.well-known/jwks.json"
-  ]
+  "version": "1.0.0"
 }
-```
-
-### 🔍 OAuth Discovery Testing
-
-Test OAuth metadata discovery:
-
-```bash
-curl https://meraki-mcp.macharpe.com/.well-known/oauth-authorization-server
-```
-
-**Expected Response:**
-```json
-{
-  "issuer": "https://meraki-mcp.macharpe.com",
-  "authorization_endpoint": "https://meraki-mcp.macharpe.com/authorize",
-  "token_endpoint": "https://meraki-mcp.macharpe.com/token",
-  "jwks_uri": "https://meraki-mcp.macharpe.com/.well-known/jwks.json",
-  "registration_endpoint": "https://meraki-mcp.macharpe.com/register",
-  "scopes_supported": ["meraki:read", "meraki:write"],
-  "response_types_supported": ["code"],
-  "grant_types_supported": ["authorization_code", "refresh_token"],
-  "code_challenge_methods_supported": ["S256"],
-  "mcp_server_info": {
-    "name": "Cisco Meraki MCP Server",
-    "version": "1.0.0",
-    "tools_count": 27
-  }
-}
-```
-
-### 🔑 Dynamic Client Registration
-
-Register a new OAuth client:
-
-```bash
-curl -X POST https://meraki-mcp.macharpe.com/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "client_name": "My MCP Client",
-    "redirect_uris": ["https://my-app.com/callback"],
-    "scope": "meraki:read"
-  }'
 ```
 
 ### 📡 MCP Protocol Testing
@@ -597,23 +493,26 @@ npm run types        # Generate Cloudflare types
 
 **Common Issues:**
 
-1. **OAuth Authentication Failures**
-   - Verify Cloudflare Access configuration
-   - Check redirect URI matches exactly
-   - Ensure domain is properly configured in Cloudflare
+1. **MCP Server Not Connecting**
+   - Verify your server URL is correct (https://your-domain.com/mcp)
+   - Check that Worker is deployed and running (test `/health` endpoint)
+   - Restart your MCP client after configuration changes
 
-2. **KV Namespace Errors**
+2. **Meraki API Errors**
+   - Verify MERAKI_API_KEY secret is set correctly
+   - Confirm API key is valid and not expired
+   - Check API key has proper organization access
+   - Ensure rate limits aren't exceeded (5 req/sec - caching helps)
+
+3. **KV Namespace Errors**
    - Verify KV namespace ID in `wrangler.jsonc`
    - Check KV namespace exists in Cloudflare dashboard
+   - Server works without KV but caching will be disabled
 
-3. **Meraki API Errors**
-   - Verify API key is valid and not expired
-   - Check API key has proper organization access
-   - Ensure rate limits aren't exceeded (5 req/sec)
-
-4. **CORS Issues**
-   - Server includes proper CORS headers for web clients
-   - Check browser console for specific CORS errors
+4. **No Data Returned**
+   - Verify your Meraki account has organizations configured
+   - Check network/device IDs are correct
+   - Review Worker logs for API error details
 
 **Debug Mode:**
 Enable detailed logging by checking Worker logs in Cloudflare dashboard or using:
