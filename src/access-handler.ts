@@ -227,6 +227,27 @@ export async function handleAccessRequest(
 		}
 	}
 
+	if (pathname === "/.well-known/oauth-protected-resource") {
+		// OAuth 2.0 Resource Server Metadata (RFC 8707)
+		const baseUrl = new URL(request.url).origin;
+		return new Response(
+			JSON.stringify({
+				resource: baseUrl,
+				authorization_servers: [baseUrl],
+				bearer_methods_supported: ["header"],
+				resource_documentation: `${baseUrl}/health`,
+				scopes_supported: ["meraki:read"],
+			}),
+			{
+				headers: {
+					"Content-Type": "application/json",
+					"Access-Control-Allow-Origin": "*",
+					"Cache-Control": "public, max-age=3600",
+				},
+			},
+		);
+	}
+
 	if (pathname === "/health") {
 		return new Response(
 			JSON.stringify({
@@ -244,6 +265,7 @@ export async function handleAccessRequest(
 					"/token",
 					"/register",
 					"/.well-known/oauth-authorization-server",
+					"/.well-known/oauth-protected-resource",
 					"/.well-known/jwks.json",
 				],
 			}),
