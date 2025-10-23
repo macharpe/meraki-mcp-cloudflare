@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **[main]** OAuth Authentication: Restored complete OAuth 2.1 authentication flow for MCP endpoints
+- **[main]** CORS Preflight: Added OPTIONS request handling for OAuth endpoints
+- **[main]** RFC 8707 Endpoint: Added OAuth 2.0 Resource Server Metadata endpoint
+- **[main]** JWKS Caching: Restored JWKS endpoint with proper caching and proxying
+- **[main]** Code Quality: Fixed all Biome linter warnings (6 warnings → 0)
+- **[main]** AI Playground Compatibility: Verified working with Cloudflare AI Playground
+
+### Changed
+- **[main]** MCP Endpoints: Re-enabled OAuth protection for `/mcp` and `/sse` endpoints
+- **[main]** OAuth Discovery: Enhanced metadata with MCP endpoint information
+
 ## [1.3.0] - 2025-10-23
 
 ### Added

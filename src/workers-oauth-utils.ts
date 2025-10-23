@@ -404,6 +404,9 @@ export function renderApprovalDialog(
 	return new Response(htmlContent, {
 		headers: {
 			"content-type": "text/html; charset=utf-8",
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type, Authorization",
 		},
 	});
 }
@@ -441,7 +444,6 @@ export async function parseRedirectApproval(
 		}
 
 		state = JSON.parse(base64urlDecode(encodedState));
-		// biome-ignore lint/suspicious/noExplicitAny: State object structure varies
 		clientId = (state as any)?.oauthReqInfo?.clientId;
 
 		if (!clientId) {
