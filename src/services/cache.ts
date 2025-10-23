@@ -194,12 +194,6 @@ export const CacheKeys = {
 	devices: (networkId: string) => `meraki:devices:${networkId}`,
 	clients: (networkId: string, timespan: number) =>
 		`meraki:clients:${networkId}:${timespan}`,
-
-	// JWKS caching
-	jwks: (url: string) => `jwks:${btoa(url)}`, // base64 encode URL for safe key
-
-	// OAuth client caching
-	oauthClient: (clientId: string) => `oauth:client:${clientId}`,
 } as const;
 
 // Cache TTL helper functions
@@ -208,11 +202,9 @@ export const CacheTTL = {
 	ORGANIZATIONS: (env: Env) =>
 		parseInt(env.CACHE_TTL_ORGANIZATIONS || "1800", 10), // 30 minutes default
 	NETWORKS: (env: Env) => parseInt(env.CACHE_TTL_NETWORKS || "900", 10), // 15 minutes default
-	JWKS_KEYS: (env: Env) => parseInt(env.CACHE_TTL_JWKS || "3600", 10), // 1 hour default
 
 	// Fixed TTL values for other data types
 	DEVICES: 300, // 5 minutes
 	CLIENTS: 300, // 5 minutes - clients change frequently
-	OAUTH_CLIENTS: 1800, // 30 minutes
 	API_RESPONSES: 60, // 1 minute for general API responses
 } as const;

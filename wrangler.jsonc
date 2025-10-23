@@ -16,8 +16,7 @@
   "vars": {
     "MERAKI_BASE_URL": "https://api.meraki.com/api/v1",
     "CACHE_TTL_ORGANIZATIONS": "1800",
-    "CACHE_TTL_NETWORKS": "900",
-    "CACHE_TTL_JWKS": "3600"
+    "CACHE_TTL_NETWORKS": "900"
   },
 
   // Durable Object binding for MCP Agent
@@ -30,12 +29,8 @@
     ]
   },
 
-  // KV namespaces for OAuth storage and API response caching
+  // KV namespace for API response caching
   "kv_namespaces": [
-    {
-      "binding": "OAUTH_KV",
-      "id": "78b0115cefe644b8915345c3b0e487e3"
-    },
     {
       "binding": "CACHE_KV",
       "id": "df5d8edf054747b2a3e957dd7b1ec355"

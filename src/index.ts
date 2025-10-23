@@ -1037,7 +1037,7 @@ async function handleMcpRequest(
 	return stub.fetch(req);
 }
 
-// Create the main handler that routes between OAuth and MCP endpoints
+// Main request handler that routes to MCP endpoints
 async function mainHandler(
 	request: Request,
 	env: Env,
