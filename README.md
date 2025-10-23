@@ -7,6 +7,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 [![Security](https://img.shields.io/github/actions/workflow/status/macharpe/meraki-mcp-cloudflare/semgrep.yml?branch=main&label=Security%20Scan&style=for-the-badge&logo=semgrep)](https://github.com/macharpe/meraki-mcp-cloudflare/actions/workflows/semgrep.yml)
 
+> **📌 Branch:** This is the **OAuth 2.1 version** with enterprise authentication. For the simpler API-key-only version, see the [`no-oauth`](https://github.com/macharpe/meraki-mcp-cloudflare/tree/no-oauth) branch. [Learn more about branches →](BRANCHES.md)
+
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/macharpe/meraki-mcp-cloudflare)
 
 A production-ready, optimized Model Context Protocol (MCP) server that provides AI assistants with comprehensive access to Cisco Meraki network management capabilities. Built on Cloudflare Workers with Durable Objects and intelligent KV caching for optimal performance.
