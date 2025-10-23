@@ -1081,11 +1081,11 @@ async function mainHandler(
 				name: "Cisco Meraki MCP Server",
 				version: "1.0.0",
 				tools_count: 27,
+				mcp_endpoint: `${baseUrl}/mcp`,
+				mcp_sse_endpoint: `${baseUrl}/sse`,
+				authentication_required: true,
+				supported_auth_methods: ["Bearer"],
 			},
-			mcp_endpoint: `${baseUrl}/mcp`,
-			mcp_sse_endpoint: `${baseUrl}/sse`,
-			authentication_required: true,
-			supported_auth_methods: ["Bearer"],
 		};
 
 		return new Response(JSON.stringify(discoveryMetadata, null, 2), {
@@ -1135,7 +1135,6 @@ async function mainHandler(
 			`[DEBUG] ACCESS_JWKS_URL not configured, returning empty JWKS`,
 		);
 		const jwks = { keys: [] };
-
 		return new Response(JSON.stringify(jwks, null, 2), {
 			headers: {
 				"Content-Type": "application/json",
@@ -1184,12 +1183,16 @@ async function mainHandler(
 			return createUnauthorizedResponse(baseUrl, error);
 		}
 
-		console.error(`[AUTH] Request authenticated successfully`);
+		// Log successful authentication
+		console.error(
+			`[AUTH] User authenticated: ${authResult.claims?.email} (${authResult.claims?.sub})`,
+		);
+
+		// Forward to MCP handler
 		return handleMcpRequest(request, env, ctx);
 	}
 
 	// All other routes go through OAuth handling
-	// biome-ignore lint/suspicious/noExplicitAny: handleAccessRequest expects different Env type
 	return handleAccessRequest(request, env as any, ctx);
 }
 

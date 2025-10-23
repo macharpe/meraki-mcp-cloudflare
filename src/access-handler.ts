@@ -95,7 +95,6 @@ export async function handleAccessRequest(
 			return new Response("Invalid request", { status: 400 });
 		}
 
-		// biome-ignore lint/suspicious/noExplicitAny: State object structure is validated above
 		return redirectToAccess(request, env, (state as any).oauthReqInfo, headers);
 	}
 
@@ -166,7 +165,6 @@ export async function handleAccessRequest(
 		console.error(`[DEBUG] Client registration request`);
 
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: Dynamic client registration body structure
 			const body = (await request.json()) as any;
 			const { client_name, redirect_uris, scope, grant_types } = body;
 
@@ -227,6 +225,184 @@ export async function handleAccessRequest(
 		}
 	}
 
+	if (request.method === "POST" && pathname === "/token") {
+		// Handle token exchange
+		try {
+			const contentType = request.headers.get("Content-Type");
+			let params: URLSearchParams;
+
+			if (contentType?.includes("application/x-www-form-urlencoded")) {
+				const body = await request.text();
+				params = new URLSearchParams(body);
+			} else if (contentType?.includes("application/json")) {
+				const body = await request.json();
+				params = new URLSearchParams(body as Record<string, string>);
+			} else {
+				return new Response(
+					JSON.stringify({
+						error: "invalid_request",
+						error_description: "Invalid Content-Type",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			const grantType = params.get("grant_type");
+			const code = params.get("code");
+			const clientId = params.get("client_id");
+
+			// Validate required parameters
+			if (grantType !== "authorization_code") {
+				return new Response(
+					JSON.stringify({
+						error: "unsupported_grant_type",
+						error_description:
+							"Only authorization_code grant type is supported",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			if (!code || !clientId) {
+				return new Response(
+					JSON.stringify({
+						error: "invalid_request",
+						error_description: "Missing code or client_id parameter",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			// Retrieve authorization data from KV
+			const authDataStr = await env.OAUTH_KV.get(`auth_code:${code}`);
+			if (!authDataStr) {
+				return new Response(
+					JSON.stringify({
+						error: "invalid_grant",
+						error_description: "Invalid or expired authorization code",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			const authData = JSON.parse(authDataStr);
+
+			// Validate client ID matches
+			if (authData.clientId !== clientId) {
+				return new Response(
+					JSON.stringify({
+						error: "invalid_grant",
+						error_description: "Client ID mismatch",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			// Check if code is expired
+			if (authData.expiresAt < Date.now()) {
+				await env.OAUTH_KV.delete(`auth_code:${code}`);
+				return new Response(
+					JSON.stringify({
+						error: "invalid_grant",
+						error_description: "Authorization code expired",
+					}),
+					{
+						status: 400,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			// Retrieve the actual Cloudflare Access token that was stored during /callback
+			const accessToken = authData.props.accessToken;
+			if (!accessToken) {
+				await env.OAUTH_KV.delete(`auth_code:${code}`);
+				return new Response(
+					JSON.stringify({
+						error: "server_error",
+						error_description: "Access token not found in authorization data",
+					}),
+					{
+						status: 500,
+						headers: {
+							"Content-Type": "application/json",
+							"Access-Control-Allow-Origin": "*",
+						},
+					},
+				);
+			}
+
+			// Delete the authorization code (one-time use)
+			await env.OAUTH_KV.delete(`auth_code:${code}`);
+
+			// Return token response
+			return new Response(
+				JSON.stringify({
+					access_token: accessToken,
+					token_type: "Bearer",
+					expires_in: 3600,
+					scope: authData.scope,
+				}),
+				{
+					status: 200,
+					headers: {
+						"Content-Type": "application/json",
+						"Access-Control-Allow-Origin": "*",
+						"Cache-Control": "no-store",
+					},
+				},
+			);
+		} catch (error) {
+			console.error(`[ERROR] Token exchange failed:`, error);
+			return new Response(
+				JSON.stringify({
+					error: "server_error",
+					error_description: "Token exchange failed",
+				}),
+				{
+					status: 500,
+					headers: {
+						"Content-Type": "application/json",
+						"Access-Control-Allow-Origin": "*",
+					},
+				},
+			);
+		}
+	}
+
 	if (pathname === "/.well-known/oauth-protected-resource") {
 		// OAuth 2.0 Resource Server Metadata (RFC 8707)
 		const baseUrl = new URL(request.url).origin;
@@ -265,7 +441,6 @@ export async function handleAccessRequest(
 					"/token",
 					"/register",
 					"/.well-known/oauth-authorization-server",
-					"/.well-known/oauth-protected-resource",
 					"/.well-known/jwks.json",
 				],
 			}),
@@ -321,7 +496,7 @@ async function redirectToAccess(
 /**
  * Helper to get the Access public keys from the certs endpoint with caching
  */
-async function fetchAccessPublicKey(env: Env, kid: string) {
+export async function fetchAccessPublicKey(env: Env, kid: string) {
 	if (!env.ACCESS_JWKS_URL) {
 		throw new Error("access jwks url not provided");
 	}
@@ -366,7 +541,7 @@ async function fetchAccessPublicKey(env: Env, kid: string) {
 /**
  * Parse a JWT into its respective pieces. Does not do any validation other than form checking.
  */
-function parseJWT(token: string) {
+export function parseJWT(token: string) {
 	const tokenParts = token.split(".");
 
 	if (
