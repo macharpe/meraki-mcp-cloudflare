@@ -5,135 +5,154 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Branch Strategy**: This project maintains two branches:
+> - **`main`**: OAuth 2.1 authentication with enterprise SSO
+> - **`no-oauth`**: Simple API key authentication
+>
+> Changes are tagged with **[main]**, **[no-oauth]**, or **[both]** to indicate applicability.
+
 ## [Unreleased]
+
+## [1.3.0] - 2025-10-23
+
+### Added
+- **[main]** OAuth 2.1 authentication middleware with JWT Bearer token verification
+- **[main]** Authentication test suite with 18 comprehensive test cases
+- **[main]** Complete OAuth flow documentation (docs/oauth-authentication-flow.md)
+- **[both]** Two-branch strategy documentation (BRANCHES.md)
+- **[both]** Branch indicators in README pointing to alternative branch
+
+### Fixed
+- **[main]** Export verifyToken function for authentication middleware compatibility
 
 ## [1.2.0] - 2025-10-20
 
 ### Changed
-- **Documentation Accuracy**: Updated authentication flow documentation to reflect API key implementation instead of OAuth
-- **README Simplification**: Removed 128 lines of misleading OAuth setup instructions
-- **Prerequisites Update**: Removed requirement for domain in Cloudflare (only needed for OAuth)
-- **Environment Variables**: Simplified to require only `MERAKI_API_KEY` for basic operation
+- **[both]** Documentation Accuracy: Updated authentication flow documentation to reflect API key implementation instead of OAuth
+- **[no-oauth]** README Simplification: Removed 128 lines of misleading OAuth setup instructions
+- **[no-oauth]** Prerequisites Update: Removed requirement for domain in Cloudflare (only needed for OAuth)
+- **[both]** Environment Variables: Simplified to require only `MERAKI_API_KEY` for basic operation
 
 ### Fixed
-- **Documentation**: Fixed misleading information about OAuth protecting MCP endpoints
+- **[both]** Documentation: Fixed misleading information about OAuth protecting MCP endpoints
 
 ## [1.1.0] - 2025-08-31
 
 ### Added
-- **Full Pagination Support**: Automatic pagination for client lists and large datasets
-- **Enhanced Caching**: Intelligent KV caching for organization/network lists, clients, and JWKS keys
+- **[both]** Full Pagination Support: Automatic pagination for client lists and large datasets
+- **[both]** Enhanced Caching: Intelligent KV caching for organization/network lists, clients, and JWKS keys
 
 ### Changed
-- **CORS Compatibility**: Added `mcp-protocol-version` header to all CORS configurations
-- **Response Headers**: Updated all MCP response headers for browser-based client compatibility
+- **[both]** CORS Compatibility: Added `mcp-protocol-version` header to all CORS configurations
+- **[both]** Response Headers: Updated all MCP response headers for browser-based client compatibility
 
 ### Fixed
-- **MCP Tool Implementations**: Completed implementations for all 27 Meraki tools
-- **CORS Issues**: Resolved cross-origin resource sharing errors with Cloudflare AI Playground
-- **Missing Data**: Fixed pagination issues causing incomplete client lists
+- **[both]** MCP Tool Implementations: Completed implementations for all 27 Meraki tools
+- **[both]** CORS Issues: Resolved cross-origin resource sharing errors with Cloudflare AI Playground
+- **[both]** Missing Data: Fixed pagination issues causing incomplete client lists
 
 ## [1.0.0] - 2025-08-29
 
 ### Added
-- **OAuth 2.1 + PKCE Infrastructure**: Complete Cloudflare Access for SaaS integration
-- **Durable Objects Agent**: Stateful MCP server implementation with SQLite storage
-- **27 Meraki MCP Tools**: Comprehensive coverage of Meraki Dashboard API
-- **KV Caching Layer**: Performance optimization with configurable TTL
-- **Custom Domain Support**: Production deployment at meraki-mcp.macharpe.com
-- **SSE Transport**: Server-Sent Events support for MCP communication
+- **[main]** OAuth 2.1 + PKCE Infrastructure: Complete Cloudflare Access for SaaS integration
+- **[both]** Durable Objects Agent: Stateful MCP server implementation with SQLite storage
+- **[both]** 27 Meraki MCP Tools: Comprehensive coverage of Meraki Dashboard API
+- **[both]** KV Caching Layer: Performance optimization with configurable TTL
+- **[both]** Custom Domain Support: Production deployment at meraki-mcp.macharpe.com
+- **[both]** SSE Transport: Server-Sent Events support for MCP communication
 
 ### Changed
-- **Architecture**: Migrated to Durable Objects for stateful agent implementation
-- **Authentication**: OAuth discovery endpoints available (not protecting MCP endpoints)
-- **Documentation**: Comprehensive OAuth setup section in README
+- **[both]** Architecture: Migrated to Durable Objects for stateful agent implementation
+- **[main]** Authentication: OAuth discovery endpoints available (not protecting MCP endpoints)
+- **[main]** Documentation: Comprehensive OAuth setup section in README
 
 ### Security
-- **Cloudflare Access**: Enterprise SSO integration infrastructure
-- **JWT Verification**: JWKS endpoint for token verification
-- **PKCE Support**: Proof Key for Code Exchange implementation
+- **[main]** Cloudflare Access: Enterprise SSO integration infrastructure
+- **[main]** JWT Verification: JWKS endpoint for token verification
+- **[main]** PKCE Support: Proof Key for Code Exchange implementation
 
 ## [0.9.0] - 2025-08-18
 
 ### Added
-- **Cloudflare Access Integration**: Zero Trust authentication infrastructure
-- **OAuth Helpers**: Custom OAuth 2.1 implementation replacing external dependencies
-- **Dynamic Client Registration**: RFC 7591 compliant client registration endpoint
+- **[main]** Cloudflare Access Integration: Zero Trust authentication infrastructure
+- **[main]** OAuth Helpers: Custom OAuth 2.1 implementation replacing external dependencies
+- **[main]** Dynamic Client Registration: RFC 7591 compliant client registration endpoint
 
 ### Security
-- **Access Policies**: Cloudflare Access for SaaS application protection
-- **JWKS Caching**: Secure token verification with cached public keys
+- **[main]** Access Policies: Cloudflare Access for SaaS application protection
+- **[main]** JWKS Caching: Secure token verification with cached public keys
 
 ## [0.8.0] - 2025-08-06
 
 ### Added
-- **Semgrep Security Scanning**: Automated security analysis workflow
-- **Security Badge**: Semgrep scan status badge in README
+- **[both]** Semgrep Security Scanning: Automated security analysis workflow
+- **[both]** Security Badge: Semgrep scan status badge in README
 
 ### Changed
-- **Code Quality**: Comprehensive codebase optimization and modernization
-- **Dependencies**: Updated to latest stable versions
-- **Documentation**: Refreshed code statistics and tool descriptions
+- **[both]** Code Quality: Comprehensive codebase optimization and modernization
+- **[both]** Dependencies: Updated to latest stable versions
+- **[both]** Documentation: Refreshed code statistics and tool descriptions
 
 ### Fixed
-- **Linting Issues**: Resolved all Biome linter warnings
-- **Tools Count**: Corrected tools count from 15 to 27 in README
+- **[both]** Linting Issues: Resolved all Biome linter warnings
+- **[both]** Tools Count: Corrected tools count from 15 to 27 in README
 
 ## [0.7.0] - 2025-08-04
 
 ### Added
-- **Deploy to Cloudflare Button**: One-click deployment with proper repository URL
-- **Workers Types**: Added @cloudflare/workers-types dependency
+- **[both]** Deploy to Cloudflare Button: One-click deployment with proper repository URL
+- **[both]** Workers Types: Added @cloudflare/workers-types dependency
 
 ### Changed
-- **Dependency Updates**: Updated all dependencies to latest versions
-- **Package Lock**: Synchronized package-lock.json with package.json
+- **[both]** Dependency Updates: Updated all dependencies to latest versions
+- **[both]** Package Lock: Synchronized package-lock.json with package.json
 
 ### Fixed
-- **Missing Dependency**: Added @cloudflare/workers-types for TypeScript support
+- **[both]** Missing Dependency: Added @cloudflare/workers-types for TypeScript support
 
 ## [0.6.0] - 2025-07-24
 
 ### Added
-- **Optional Authentication**: Bearer token support for secured endpoints
-- **Environment Variables**: Configurable authentication settings
+- **[main]** Optional Authentication: Bearer token support for secured endpoints
+- **[both]** Environment Variables: Configurable authentication settings
 
 ### Fixed
-- **Configuration Examples**: Removed shell artifact from .env.example
-- **Placeholder Values**: Clean .env.example with secure placeholder API key
+- **[both]** Configuration Examples: Removed shell artifact from .env.example
+- **[both]** Placeholder Values: Clean .env.example with secure placeholder API key
 
 ## [0.5.0] - 2025-07-18
 
 ### Added
-- **12 Additional MCP Tools**: Expanded from 15 to 27 total Meraki API tools
+- **[both]** 12 Additional MCP Tools: Expanded from 15 to 27 total Meraki API tools
   - Switch port operations
   - Wireless management (RF profiles, channel utilization, signal quality)
   - Appliance security and traffic shaping
 
 ### Changed
-- **Refactoring Cleanup**: Code organization and structure improvements
-- **License**: Changed from MIT to GPL v3
+- **[both]** Refactoring Cleanup: Code organization and structure improvements
+- **[both]** License: Changed from MIT to GPL v3
 
 ### Fixed
-- **Code Quality**: Resolved refactoring issues and improved maintainability
+- **[both]** Code Quality: Resolved refactoring issues and improved maintainability
 
 ## [0.4.0] - 2025-07-12
 
 ### Added
-- **Initial Release**: Cisco Meraki MCP Server on Cloudflare Workers
-- **15 Core MCP Tools**: Organization, network, device, and client management
-- **Meraki API Integration**: Direct integration with Cisco Meraki Dashboard API v1
-- **Environment Configuration**: .env.example with secure placeholder values
+- **[both]** Initial Release: Cisco Meraki MCP Server on Cloudflare Workers
+- **[both]** 15 Core MCP Tools: Organization, network, device, and client management
+- **[both]** Meraki API Integration: Direct integration with Cisco Meraki Dashboard API v1
+- **[both]** Environment Configuration: .env.example with secure placeholder values
 
 ### Changed
-- **Project Naming**: Harmonized naming to meraki-mcp-cloudflare
-- **Deployment Pipeline**: Cloudflare Pages deployment testing
+- **[both]** Project Naming: Harmonized naming to meraki-mcp-cloudflare
+- **[both]** Deployment Pipeline: Cloudflare Pages deployment testing
 
 ### Security
-- **API Key Protection**: Removed real API key from version control
-- **Secure Configuration**: Clean .env.example with placeholder values
+- **[both]** API Key Protection: Removed real API key from version control
+- **[both]** Secure Configuration: Clean .env.example with placeholder values
 
-[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v0.9.0...v1.0.0
