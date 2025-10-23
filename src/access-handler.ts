@@ -351,7 +351,7 @@ function parseJWT(token: string) {
 /**
  * Validates the provided token using the Access public key set
  */
-async function verifyToken(env: Env, token: string) {
+export async function verifyToken(env: Env, token: string) {
 	const jwt = parseJWT(token);
 	const key = await fetchAccessPublicKey(env, jwt.header.kid);
 
