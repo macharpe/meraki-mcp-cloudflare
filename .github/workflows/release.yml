@@ -1,5 +1,9 @@
 name: 🚀 Release
 
+# This workflow only runs on the main branch (OAuth version).
+# The no-oauth branch shares the same CHANGELOG with branch indicators
+# ([main], [no-oauth], [both]) to show which changes apply to each version.
+
 on:
   push:
     branches: [main]
