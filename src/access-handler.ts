@@ -81,6 +81,7 @@ export async function handleAccessRequest(
 			return new Response("Invalid request", { status: 400 });
 		}
 
+		// biome-ignore lint/suspicious/noExplicitAny: State object structure is validated above
 		return redirectToAccess(request, env, (state as any).oauthReqInfo, headers);
 	}
 
@@ -151,6 +152,7 @@ export async function handleAccessRequest(
 		console.error(`[DEBUG] Client registration request`);
 
 		try {
+			// biome-ignore lint/suspicious/noExplicitAny: Dynamic client registration body structure
 			const body = (await request.json()) as any;
 			const { client_name, redirect_uris, scope, grant_types } = body;
 

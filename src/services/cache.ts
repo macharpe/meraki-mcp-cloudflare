@@ -9,12 +9,11 @@ export interface CacheOptions {
 export class CacheService {
 	private kv: KVNamespace;
 	private defaultTtl: number = 300; // 5 minutes default
-	private env: Env;
 	private workersCache: Cache;
 
 	constructor(env: Env) {
 		this.kv = env.CACHE_KV;
-		this.env = env;
+		// biome-ignore lint/suspicious/noExplicitAny: Cloudflare Workers caches global requires any cast
 		this.workersCache = (caches as any).default as Cache;
 	}
 

@@ -1189,6 +1189,7 @@ async function mainHandler(
 	}
 
 	// All other routes go through OAuth handling
+	// biome-ignore lint/suspicious/noExplicitAny: handleAccessRequest expects different Env type
 	return handleAccessRequest(request, env as any, ctx);
 }
 
