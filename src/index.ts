@@ -1,6 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { handleAccessRequest } from "./access-handler";
+import {
+	authenticateMcpRequest,
+	createUnauthorizedResponse,
+} from "./middleware/auth";
+import { CacheKeys, CacheService, CacheTTL } from "./services/cache";
 import { MerakiAPIService } from "./services/merakiapi";
 import type { Env } from "./types/env";
 
@@ -1077,6 +1082,10 @@ async function mainHandler(
 				version: "1.0.0",
 				tools_count: 27,
 			},
+			mcp_endpoint: `${baseUrl}/mcp`,
+			mcp_sse_endpoint: `${baseUrl}/sse`,
+			authentication_required: true,
+			supported_auth_methods: ["Bearer"],
 		};
 
 		return new Response(JSON.stringify(discoveryMetadata, null, 2), {
@@ -1090,17 +1099,48 @@ async function mainHandler(
 
 	if (pathname === "/.well-known/jwks.json") {
 		console.error(`[DEBUG] JWKS endpoint requested`);
-		// For now, return empty JWKS since we're using Cloudflare Access tokens
-		// In a full implementation, this would contain the public keys for token verification
-		const jwks = {
-			keys: [],
-		};
+
+		// Proxy Cloudflare Access JWKS endpoint
+		if (env.ACCESS_JWKS_URL) {
+			try {
+				const cache = new CacheService(env);
+				const cacheKey = CacheKeys.jwks(env.ACCESS_JWKS_URL);
+
+				let jwks = await cache.get(cacheKey);
+
+				if (!jwks) {
+					console.error(`[DEBUG] Fetching JWKS from ${env.ACCESS_JWKS_URL}`);
+					const resp = await fetch(env.ACCESS_JWKS_URL);
+					jwks = await resp.json();
+					await cache.set(cacheKey, jwks, { ttl: CacheTTL.JWKS_KEYS(env) });
+					console.error(`[DEBUG] JWKS cached successfully`);
+				} else {
+					console.error(`[DEBUG] JWKS served from cache`);
+				}
+
+				return new Response(JSON.stringify(jwks, null, 2), {
+					headers: {
+						"Content-Type": "application/json",
+						"Access-Control-Allow-Origin": "*",
+						"Cache-Control": "public, max-age=3600, s-maxage=3600",
+					},
+				});
+			} catch (error) {
+				console.error("[ERROR] Failed to fetch JWKS:", error);
+			}
+		}
+
+		// Fallback: return empty JWKS if Access not configured
+		console.error(
+			`[DEBUG] ACCESS_JWKS_URL not configured, returning empty JWKS`,
+		);
+		const jwks = { keys: [] };
 
 		return new Response(JSON.stringify(jwks, null, 2), {
 			headers: {
 				"Content-Type": "application/json",
 				"Access-Control-Allow-Origin": "*",
-				"Cache-Control": "public, max-age=3600, s-maxage=3600", // 1 hour browser + edge cache
+				"Cache-Control": "public, max-age=3600, s-maxage=3600",
 			},
 		});
 	}
@@ -1123,16 +1163,33 @@ async function mainHandler(
 		});
 	}
 
-	// Handle MCP endpoints directly without OAuth protection
+	// Handle MCP endpoints with OAuth protection
 	if (
 		pathname === "/sse" ||
 		pathname === "/sse/message" ||
 		pathname === "/mcp"
 	) {
+		// Authenticate request
+		const authResult = await authenticateMcpRequest(request, env);
+
+		if (!authResult.authenticated) {
+			const baseUrl = new URL(request.url).origin;
+			const error = authResult.error ?? {
+				code: "unknown_error",
+				message: "Authentication failed",
+			};
+			console.error(
+				`[AUTH] Authentication failed: ${error.code} - ${error.message}`,
+			);
+			return createUnauthorizedResponse(baseUrl, error);
+		}
+
+		console.error(`[AUTH] Request authenticated successfully`);
 		return handleMcpRequest(request, env, ctx);
 	}
 
 	// All other routes go through OAuth handling
+	// biome-ignore lint/suspicious/noExplicitAny: handleAccessRequest expects different Env type
 	return handleAccessRequest(request, env as any, ctx);
 }
 

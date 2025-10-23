@@ -441,6 +441,7 @@ export async function parseRedirectApproval(
 		}
 
 		state = JSON.parse(base64urlDecode(encodedState));
+		// biome-ignore lint/suspicious/noExplicitAny: State object structure varies
 		clientId = (state as any)?.oauthReqInfo?.clientId;
 
 		if (!clientId) {
