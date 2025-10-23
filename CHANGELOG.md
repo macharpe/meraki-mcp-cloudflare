@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-10-23
+
 ### Fixed
 - **[main]** OAuth Authentication: Restored complete OAuth 2.1 authentication flow for MCP endpoints
 - **[main]** CORS Preflight: Added OPTIONS request handling for OAuth endpoints
@@ -163,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **[both]** API Key Protection: Removed real API key from version control
 - **[both]** Secure Configuration: Clean .env.example with placeholder values
 
-[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.0.0...v1.1.0
