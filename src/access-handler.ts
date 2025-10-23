@@ -39,6 +39,20 @@ export async function handleAccessRequest(
 ) {
 	const { pathname, searchParams } = new URL(request.url);
 
+	// Handle CORS preflight requests for OAuth endpoints
+	if (request.method === "OPTIONS") {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+				"Access-Control-Allow-Headers":
+					"Content-Type, Authorization, Cache-Control",
+				"Access-Control-Max-Age": "86400",
+			},
+		});
+	}
+
 	if (request.method === "GET" && pathname === "/authorize") {
 		const oauthHelpers = createOAuthHelpers(env);
 		const oauthReqInfo = await oauthHelpers.parseAuthRequest(request);
