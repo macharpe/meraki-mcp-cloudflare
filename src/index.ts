@@ -1,6 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
-import { handleAccessRequest } from "./access-handler";
 import { MerakiAPIService } from "./services/merakiapi";
 import type { Env } from "./types/env";
 
@@ -1048,63 +1047,6 @@ async function mainHandler(
 	console.error(`[DEBUG] mainHandler: ${request.method} ${pathname}`);
 	console.error(`[DEBUG] env.MCP_OBJECT available:`, !!env.MCP_OBJECT);
 
-	// Handle OAuth discovery endpoints
-	if (pathname === "/.well-known/oauth-authorization-server") {
-		console.error(`[DEBUG] OAuth discovery endpoint requested`);
-		const baseUrl = new URL(request.url).origin;
-
-		const discoveryMetadata = {
-			issuer: baseUrl,
-			authorization_endpoint: `${baseUrl}/authorize`,
-			token_endpoint: `${baseUrl}/token`,
-			jwks_uri: `${baseUrl}/.well-known/jwks.json`,
-			registration_endpoint: `${baseUrl}/register`,
-			scopes_supported: ["meraki:read", "meraki:write"],
-			response_types_supported: ["code"],
-			response_modes_supported: ["query"],
-			grant_types_supported: ["authorization_code", "refresh_token"],
-			token_endpoint_auth_methods_supported: [
-				"client_secret_post",
-				"client_secret_basic",
-			],
-			code_challenge_methods_supported: ["S256"],
-			subject_types_supported: ["public"],
-			id_token_signing_alg_values_supported: ["RS256"],
-			claims_supported: ["sub", "aud", "iss", "iat", "exp", "email", "name"],
-			// MCP-specific metadata
-			mcp_server_info: {
-				name: "Cisco Meraki MCP Server",
-				version: "1.0.0",
-				tools_count: 27,
-			},
-		};
-
-		return new Response(JSON.stringify(discoveryMetadata, null, 2), {
-			headers: {
-				"Content-Type": "application/json",
-				"Access-Control-Allow-Origin": "*",
-				"Cache-Control": "public, max-age=3600, s-maxage=3600", // 1 hour browser + edge cache
-			},
-		});
-	}
-
-	if (pathname === "/.well-known/jwks.json") {
-		console.error(`[DEBUG] JWKS endpoint requested`);
-		// For now, return empty JWKS since we're using Cloudflare Access tokens
-		// In a full implementation, this would contain the public keys for token verification
-		const jwks = {
-			keys: [],
-		};
-
-		return new Response(JSON.stringify(jwks, null, 2), {
-			headers: {
-				"Content-Type": "application/json",
-				"Access-Control-Allow-Origin": "*",
-				"Cache-Control": "public, max-age=3600, s-maxage=3600", // 1 hour browser + edge cache
-			},
-		});
-	}
-
 	// Handle CORS preflight requests for MCP endpoints
 	if (
 		request.method === "OPTIONS" &&
@@ -1123,7 +1065,7 @@ async function mainHandler(
 		});
 	}
 
-	// Handle MCP endpoints directly without OAuth protection
+	// Handle MCP endpoints directly
 	if (
 		pathname === "/sse" ||
 		pathname === "/sse/message" ||
@@ -1132,8 +1074,26 @@ async function mainHandler(
 		return handleMcpRequest(request, env, ctx);
 	}
 
-	// All other routes go through OAuth handling
-	return handleAccessRequest(request, env as any, ctx);
+	// Health check endpoint
+	if (pathname === "/health") {
+		return new Response(
+			JSON.stringify({
+				status: "healthy",
+				service: "Cisco Meraki MCP Server",
+				version: "1.0.0",
+				endpoints: ["/mcp", "/sse", "/health"],
+			}),
+			{
+				headers: {
+					"Content-Type": "application/json",
+					"Access-Control-Allow-Origin": "*",
+				},
+			},
+		);
+	}
+
+	// All other routes return 404
+	return new Response("Not Found", { status: 404 });
 }
 
 export default {
