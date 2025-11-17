@@ -109,9 +109,17 @@ export async function handleAccessRequest(
 			return new Response("Invalid state", { status: 400 });
 		}
 
-		// Retrieve code verifier from KV storage using the same key format used for storage
-		// The storage key is created by base64url encoding the oauthReqInfo, so we recreate it here
-		const stateKey = base64urlEncode(JSON.stringify(oauthReqInfo));
+		// Hash the oauthReqInfo to create the same key used during storage
+		const stateJson = JSON.stringify(oauthReqInfo);
+		const stateHash = await crypto.subtle.digest(
+			"SHA-256",
+			new TextEncoder().encode(stateJson),
+		);
+		const stateKey = Array.from(new Uint8Array(stateHash))
+			.map((b) => b.toString(16).padStart(2, "0"))
+			.join("");
+
+		// Retrieve code verifier from KV storage using the hashed key
 		const codeVerifier = await env.OAUTH_KV.get(`code_verifier:${stateKey}`);
 		if (!codeVerifier) {
 			return new Response("Missing code verifier", { status: 400 });
@@ -130,8 +138,9 @@ export async function handleAccessRequest(
 			return errResponse;
 		}
 
-		// Clean up code verifier from KV
+		// Clean up code verifier and oauth request info from KV
 		await env.OAUTH_KV.delete(`code_verifier:${stateKey}`);
+		await env.OAUTH_KV.delete(`oauth_req_info:${stateKey}`);
 
 		const idTokenClaims = await verifyToken(env, idToken);
 		const user = {
@@ -255,7 +264,7 @@ export async function handleAccessRequest(
 
 			const grantType = params.get("grant_type");
 			const code = params.get("code");
-			const clientId = params.get("client_id");
+			let clientId = params.get("client_id");
 
 			// Validate required parameters
 			if (grantType !== "authorization_code") {
@@ -275,11 +284,11 @@ export async function handleAccessRequest(
 				);
 			}
 
-			if (!code || !clientId) {
+			if (!code) {
 				return new Response(
 					JSON.stringify({
 						error: "invalid_request",
-						error_description: "Missing code or client_id parameter",
+						error_description: "Missing code parameter",
 					}),
 					{
 						status: 400,
@@ -310,6 +319,12 @@ export async function handleAccessRequest(
 			}
 
 			const authData = JSON.parse(authDataStr);
+
+			// If client_id not provided in request, use it from stored auth data
+			// This handles clients like Cloudflare AI Playground that don't send client_id
+			if (!clientId) {
+				clientId = authData.clientId;
+			}
 
 			// Validate client ID matches
 			if (authData.clientId !== clientId) {
@@ -476,11 +491,25 @@ async function redirectToAccess(
 		upstream_url: env.ACCESS_AUTHORIZATION_URL,
 	});
 
-	// Store code verifier in KV for use in callback
-	const stateKey = base64urlEncode(JSON.stringify(oauthReqInfo));
+	// Hash the oauthReqInfo to create a fixed-length key (avoids exceeding 512-byte KV key limit)
+	const stateJson = JSON.stringify(oauthReqInfo);
+	const stateHash = await crypto.subtle.digest(
+		"SHA-256",
+		new TextEncoder().encode(stateJson),
+	);
+	const stateKey = Array.from(new Uint8Array(stateHash))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+
+	// Store both code verifier and oauthReqInfo in KV for use in callback
 	await env.OAUTH_KV.put(
 		`code_verifier:${stateKey}`,
 		codeVerifier,
+		{ expirationTtl: 600 }, // 10 minutes
+	);
+	await env.OAUTH_KV.put(
+		`oauth_req_info:${stateKey}`,
+		stateJson,
 		{ expirationTtl: 600 }, // 10 minutes
 	);
 
