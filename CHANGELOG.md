@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-11-17
+
+### Fixed
+- **[main]** OAuth Token Exchange: Made `client_id` parameter optional in token requests to support non-standard OAuth clients like Cloudflare AI Playground
+- **[main]** KV Storage: Improved state key generation using SHA-256 hashing to avoid 512-byte key limit issues
+- **[main]** OAuth Cleanup: Enhanced KV cleanup to remove both `code_verifier` and `oauth_req_info` after token exchange
+
+### Changed
+- **[main]** OAuth Compatibility: Retrieves `client_id` from stored authorization data when not provided in token request
+- **[main]** Security: Maintains client validation by comparing retrieved `client_id` with stored auth data
+
 ## [1.3.1] - 2025-10-23
 
 ### Fixed
@@ -165,7 +176,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **[both]** API Key Protection: Removed real API key from version control
 - **[both]** Secure Configuration: Clean .env.example with placeholder values
 
-[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/macharpe/meraki-mcp-cloudflare/compare/v1.1.0...v1.2.0
