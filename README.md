@@ -203,15 +203,6 @@ Set these using `npx wrangler secret put <SECRET_NAME>`:
 | `ACCESS_JWKS_URL` | Cloudflare Access JWKS endpoint | From Access for SaaS application configuration |
 | `COOKIE_ENCRYPTION_KEY` | 32-byte hex key for cookie encryption | Generate with: `openssl rand -hex 32` |
 
-### Optional Configuration
-
-These are already configured in `wrangler.jsonc` with sensible defaults. You can modify them if needed:
-
-- `MERAKI_BASE_URL` - Meraki API base URL (default: `https://api.meraki.com/api/v1`)
-- `CACHE_TTL_ORGANIZATIONS` - Organization cache TTL in seconds (default: `1800` = 30 minutes)
-- `CACHE_TTL_NETWORKS` - Network cache TTL in seconds (default: `900` = 15 minutes)
-- `CACHE_TTL_JWKS` - JWKS cache TTL in seconds (default: `3600` = 1 hour)
-
 ---
 
 ## 📁 Project Structure
