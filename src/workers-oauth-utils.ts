@@ -78,14 +78,12 @@ async function getApprovedClientsFromCookie(
 	const parts = cookieValue.split(".");
 
 	if (parts.length !== 2) {
-		console.warn("Invalid cookie format received.");
 		return null; // Invalid format
 	}
 
 	const signatureHex = parts[0];
 	const base64Payload = parts[1];
 	if (!signatureHex || !base64Payload) {
-		console.warn("Invalid cookie parts.");
 		return null;
 	}
 
@@ -106,24 +104,20 @@ async function getApprovedClientsFromCookie(
 	);
 
 	if (!isValid) {
-		console.warn("Cookie signature verification failed.");
 		return null; // Signature invalid
 	}
 
 	try {
 		const approvedClients = JSON.parse(new TextDecoder().decode(payload));
 		if (!Array.isArray(approvedClients)) {
-			console.warn("Cookie payload is not an array.");
 			return null; // Payload isn't an array
 		}
 		// Ensure all elements are strings
 		if (!approvedClients.every((item) => typeof item === "string")) {
-			console.warn("Cookie payload contains non-string elements.");
 			return null;
 		}
 		return approvedClients as string[];
-	} catch (e) {
-		console.error("Error parsing cookie payload:", e);
+	} catch (_e) {
 		return null; // JSON parsing failed
 	}
 }
@@ -450,7 +444,6 @@ export async function parseRedirectApproval(
 			throw new Error("Could not extract clientId from state object.");
 		}
 	} catch (e) {
-		console.error("Error processing form submission:", e);
 		throw new Error(
 			`Failed to parse approval form: ${e instanceof Error ? e.message : String(e)}`,
 		);
@@ -562,7 +555,6 @@ export async function fetchUpstreamAuthToken({
 		method: "POST",
 	});
 	if (!resp.ok) {
-		console.log(await resp.text());
 		return [
 			null,
 			null,

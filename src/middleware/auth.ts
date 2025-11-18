@@ -74,8 +74,6 @@ export async function authenticateMcpRequest(
 			},
 		};
 	} catch (error) {
-		console.error("[AUTH] Token verification failed:", error);
-
 		// Determine error code based on error type
 		const errorMessage =
 			error instanceof Error ? error.message : "Token verification failed";
