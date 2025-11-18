@@ -171,8 +171,6 @@ export async function handleAccessRequest(
 
 	// Handle dynamic client registration
 	if (request.method === "POST" && pathname === "/register") {
-		console.error(`[DEBUG] Client registration request`);
-
 		try {
 			const body = (await request.json()) as any;
 			const { client_name, redirect_uris, scope, grant_types } = body;
@@ -216,8 +214,7 @@ export async function handleAccessRequest(
 					},
 				},
 			);
-		} catch (error) {
-			console.error(`[ERROR] Client registration failed:`, error);
+		} catch (_error) {
 			return new Response(
 				JSON.stringify({
 					error: "invalid_request",
@@ -400,8 +397,7 @@ export async function handleAccessRequest(
 					},
 				},
 			);
-		} catch (error) {
-			console.error(`[ERROR] Token exchange failed:`, error);
+		} catch (_error) {
 			return new Response(
 				JSON.stringify({
 					error: "server_error",

@@ -9,12 +9,10 @@ export interface CacheOptions {
 export class CacheService {
 	private kv: KVNamespace;
 	private defaultTtl: number = 300; // 5 minutes default
-	private env: Env;
 	private workersCache: Cache;
 
 	constructor(env: Env) {
 		this.kv = env.CACHE_KV;
-		this.env = env;
 		this.workersCache = (caches as any).default as Cache;
 	}
 
@@ -38,14 +36,11 @@ export class CacheService {
 			const cached = await this.kv.get(cacheKey, "json");
 
 			if (cached) {
-				console.log("[CACHE] Hit for key:", cacheKey);
 				return cached as T;
 			}
 
-			console.log("[CACHE] Miss for key:", cacheKey);
 			return null;
-		} catch (error) {
-			console.error("[CACHE] Error getting key:", key, error);
+		} catch (_error) {
 			return null;
 		}
 	}
@@ -65,10 +60,8 @@ export class CacheService {
 			await this.kv.put(cacheKey, JSON.stringify(value), {
 				expirationTtl: ttl,
 			});
-
-			console.log("[CACHE] Set key:", cacheKey, "(TTL:", `${ttl}s)`);
-		} catch (error) {
-			console.error("[CACHE] Error setting key:", key, error);
+		} catch (_error) {
+			// Silently fail on cache set errors
 		}
 	}
 
@@ -83,9 +76,8 @@ export class CacheService {
 		try {
 			const cacheKey = this.getCacheKey(key, options?.namespace);
 			await this.kv.delete(cacheKey);
-			console.log("[CACHE] Deleted key:", cacheKey);
-		} catch (error) {
-			console.error("[CACHE] Error deleting key:", key, error);
+		} catch (_error) {
+			// Silently fail on cache delete errors
 		}
 	}
 
@@ -102,16 +94,9 @@ export class CacheService {
 		if (cached !== null) {
 			return cached;
 		}
-
-		// Cache miss - execute function and cache result
-		try {
-			const result = await fetchFunction();
-			await this.set(key, result, options);
-			return result;
-		} catch (error) {
-			console.error("[CACHE] Error in getOrSet for key:", key, error);
-			throw error;
-		}
+		const result = await fetchFunction();
+		await this.set(key, result, options);
+		return result;
 	}
 
 	/**
@@ -132,17 +117,12 @@ export class CacheService {
 			const cachedResponse = await this.workersCache.match(cacheKey);
 			if (cachedResponse) {
 				const data = (await cachedResponse.json()) as T;
-				console.log("[WORKERS_CACHE] HIT for key:", key);
 				return { data, cacheStatus: "HIT" };
 			}
-
-			console.log("[WORKERS_CACHE] MISS for key:", key);
 
 			// Layer 2: Try KV cache (medium speed - 10-50ms)
 			const kvCached = await this.get<T>(key, options);
 			if (kvCached !== null) {
-				console.log("[KV_CACHE] HIT for key:", key);
-
 				// Store in Workers Cache for next request (non-blocking)
 				const response = new Response(JSON.stringify(kvCached), {
 					headers: {
@@ -154,8 +134,6 @@ export class CacheService {
 
 				return { data: kvCached, cacheStatus: "MISS" };
 			}
-
-			console.log("[KV_CACHE] MISS for key:", key);
 
 			// Layer 3: Complete cache miss - fetch from origin (slowest)
 			const result = await fetchFunction();
@@ -173,12 +151,7 @@ export class CacheService {
 			await this.workersCache.put(cacheKey, response); // Store in Workers Cache
 
 			return { data: result, cacheStatus: "MISS" };
-		} catch (error) {
-			console.error(
-				"[CACHE] Error in getWithWorkersCache for key:",
-				key,
-				error,
-			);
+		} catch (_error) {
 			// Fallback to direct fetch on cache error
 			const result = await fetchFunction();
 			return { data: result, cacheStatus: "MISS" };

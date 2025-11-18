@@ -22,17 +22,7 @@ export class MerakiMCPAgent extends McpAgent<
 	private initialized = false;
 
 	async fetch(request: Request): Promise<Response> {
-		console.error(
-			`[DEBUG] MerakiMCPAgent.fetch called with ${request.method} ${new URL(request.url).pathname}`,
-		);
-		console.error(
-			`[DEBUG] Authorization header:`,
-			request.headers.get("Authorization"),
-		);
-		console.error(`[DEBUG] this.env available:`, !!this.env);
-
 		if (!this.initialized) {
-			console.error(`[DEBUG] Initializing MerakiMCPAgent in fetch`);
 			await this.init();
 			this.initialized = true;
 		}
@@ -41,10 +31,10 @@ export class MerakiMCPAgent extends McpAgent<
 
 		// Handle SSE endpoints for supergateway compatibility
 		if (pathname === "/sse") {
-			console.error(`[DEBUG] Handling SSE stream request`);
-
 			// For GET requests, return SSE stream
 			if (request.method === "GET") {
+				let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+
 				const stream = new ReadableStream({
 					start(controller) {
 						// Send initial connection message
@@ -55,13 +45,22 @@ export class MerakiMCPAgent extends McpAgent<
 						);
 
 						// Keep connection alive with periodic pings
-						const interval = setInterval(() => {
+						keepAliveInterval = setInterval(() => {
 							try {
 								controller.enqueue(new TextEncoder().encode(": ping\n\n"));
 							} catch (_e) {
-								clearInterval(interval);
+								if (keepAliveInterval) {
+									clearInterval(keepAliveInterval);
+									keepAliveInterval = null;
+								}
 							}
 						}, 30000); // Every 30 seconds
+					},
+					cancel() {
+						if (keepAliveInterval) {
+							clearInterval(keepAliveInterval);
+							keepAliveInterval = null;
+						}
 					},
 				});
 
@@ -80,21 +79,17 @@ export class MerakiMCPAgent extends McpAgent<
 		}
 
 		if (pathname === "/sse/message") {
-			console.error(`[DEBUG] Handling SSE message POST request`);
-
 			// Handle POST requests to /sse/message (for sending MCP requests via SSE)
 			if (request.method === "POST") {
 				// This endpoint would normally handle MCP requests sent via POST
 				// and return responses that get sent over the SSE stream
 				// For now, redirect to regular MCP handling
 				const body = await request.text();
-				console.error(`[DEBUG] SSE message body:`, body);
 
 				// Process the MCP request and return JSON response
 				// This should be the same logic as the /mcp POST handler
 				try {
 					const mcpRequest = JSON.parse(body);
-					console.error(`[DEBUG] Parsed SSE MCP request:`, mcpRequest);
 
 					// Use the same MCP handling logic as /mcp endpoint
 					// For now, redirect to a simple response
@@ -115,8 +110,7 @@ export class MerakiMCPAgent extends McpAgent<
 							},
 						},
 					);
-				} catch (error) {
-					console.error(`[ERROR] Failed to parse SSE message:`, error);
+				} catch (_error) {
 					return new Response(
 						JSON.stringify({
 							jsonrpc: "2.0",
@@ -139,10 +133,6 @@ export class MerakiMCPAgent extends McpAgent<
 		}
 
 		if (pathname === "/mcp") {
-			console.error(
-				`[DEBUG] Handling MCP request - using direct server response`,
-			);
-
 			// Helper function to create responses with consistent CORS headers
 			const createMcpResponse = (data: unknown, status = 200) => {
 				return new Response(JSON.stringify(data), {
@@ -159,10 +149,11 @@ export class MerakiMCPAgent extends McpAgent<
 
 			// Handle basic MCP protocol messages directly
 			const body = await request.text();
-			console.error(`[DEBUG] MCP request body:`, body);
 
 			// Handle GET requests - return SSE stream for SSE transport
 			if (request.method === "GET" || !body.trim()) {
+				let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+
 				// Create a proper SSE stream
 				const stream = new ReadableStream({
 					start(controller) {
@@ -174,13 +165,22 @@ export class MerakiMCPAgent extends McpAgent<
 						);
 
 						// Keep connection alive with periodic pings
-						const interval = setInterval(() => {
+						keepAliveInterval = setInterval(() => {
 							try {
 								controller.enqueue(new TextEncoder().encode(": ping\n\n"));
 							} catch (_e) {
-								clearInterval(interval);
+								if (keepAliveInterval) {
+									clearInterval(keepAliveInterval);
+									keepAliveInterval = null;
+								}
 							}
 						}, 30000); // Every 30 seconds
+					},
+					cancel() {
+						if (keepAliveInterval) {
+							clearInterval(keepAliveInterval);
+							keepAliveInterval = null;
+						}
 					},
 				});
 
@@ -199,7 +199,6 @@ export class MerakiMCPAgent extends McpAgent<
 
 			try {
 				const mcpRequest = JSON.parse(body);
-				console.error(`[DEBUG] Parsed MCP request:`, mcpRequest);
 
 				if (mcpRequest.method === "initialize") {
 					// Match the client's protocol version
@@ -668,9 +667,6 @@ export class MerakiMCPAgent extends McpAgent<
 								);
 								break;
 							case "meraki_get_management_interface":
-								console.error(
-									`[DEBUG] Executing meraki_get_management_interface`,
-								);
 								result = await merakiService.getManagementInterface(
 									mcpRequest.params.arguments.serial,
 								);
@@ -681,34 +677,22 @@ export class MerakiMCPAgent extends McpAgent<
 								);
 								break;
 							case "meraki_get_switch_port_statuses":
-								console.error(
-									`[DEBUG] Executing meraki_get_switch_port_statuses`,
-								);
 								result = await merakiService.getSwitchPortStatuses(
 									mcpRequest.params.arguments.serial,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_switch_routing_interfaces":
-								console.error(
-									`[DEBUG] Executing meraki_get_switch_routing_interfaces`,
-								);
 								result = await merakiService.getSwitchRoutingInterfaces(
 									mcpRequest.params.arguments.serial,
 								);
 								break;
 							case "meraki_get_switch_static_routes":
-								console.error(
-									`[DEBUG] Executing meraki_get_switch_static_routes`,
-								);
 								result = await merakiService.getSwitchStaticRoutes(
 									mcpRequest.params.arguments.serial,
 								);
 								break;
 							case "meraki_get_wireless_radio_settings":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_radio_settings`,
-								);
 								result = await merakiService.getWirelessRadioSettings(
 									mcpRequest.params.arguments.serial,
 								);
@@ -719,9 +703,6 @@ export class MerakiMCPAgent extends McpAgent<
 								);
 								break;
 							case "meraki_get_wireless_latency_stats":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_latency_stats`,
-								);
 								result = await merakiService.getWirelessLatencyStats(
 									mcpRequest.params.arguments.serial,
 									mcpRequest.params.arguments.timespan,
@@ -729,78 +710,51 @@ export class MerakiMCPAgent extends McpAgent<
 								break;
 							// Appliance Management Tools
 							case "meraki_get_appliance_vpn_site_to_site":
-								console.error(
-									`[DEBUG] Executing meraki_get_appliance_vpn_site_to_site`,
-								);
 								result = await merakiService.getApplianceVpnSiteToSite(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							case "meraki_get_appliance_content_filtering":
-								console.error(
-									`[DEBUG] Executing meraki_get_appliance_content_filtering`,
-								);
 								result = await merakiService.getApplianceContentFiltering(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							case "meraki_get_appliance_security_events":
-								console.error(
-									`[DEBUG] Executing meraki_get_appliance_security_events`,
-								);
 								result = await merakiService.getApplianceSecurityEvents(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_appliance_traffic_shaping":
-								console.error(
-									`[DEBUG] Executing meraki_get_appliance_traffic_shaping`,
-								);
 								result = await merakiService.getApplianceTrafficShaping(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							// Additional Wireless Management Tools
 							case "meraki_get_wireless_rf_profiles":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_rf_profiles`,
-								);
 								result = await merakiService.getWirelessRfProfiles(
 									mcpRequest.params.arguments.networkId,
 								);
 								break;
 							case "meraki_get_wireless_channel_utilization":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_channel_utilization`,
-								);
 								result = await merakiService.getWirelessChannelUtilization(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_wireless_signal_quality":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_signal_quality`,
-								);
 								result = await merakiService.getWirelessSignalQuality(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_wireless_connection_stats":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_connection_stats`,
-								);
 								result = await merakiService.getWirelessConnectionStats(
 									mcpRequest.params.arguments.networkId,
 									mcpRequest.params.arguments.timespan,
 								);
 								break;
 							case "meraki_get_wireless_client_connectivity_events":
-								console.error(
-									`[DEBUG] Executing meraki_get_wireless_client_connectivity_events`,
-								);
 								result =
 									await merakiService.getWirelessClientConnectivityEvents(
 										mcpRequest.params.arguments.networkId,
@@ -837,15 +791,6 @@ export class MerakiMCPAgent extends McpAgent<
 
 						return finalResponse;
 					} catch (error) {
-						console.error(`[ERROR] ========== TOOL CALL ERROR ==========`);
-						console.error(`[ERROR] Tool execution error:`, error);
-						console.error(
-							`[ERROR] Error stack:`,
-							error instanceof Error ? error.stack : "No stack trace",
-						);
-						console.error(`[ERROR] Request ID:`, mcpRequest.id);
-						console.error(`[ERROR] ========== TOOL CALL ERROR END ==========`);
-
 						return new Response(
 							JSON.stringify({
 								jsonrpc: "2.0",
@@ -909,6 +854,26 @@ export class MerakiMCPAgent extends McpAgent<
 					);
 				}
 
+				if (mcpRequest.method === "resources/templates/list") {
+					return new Response(
+						JSON.stringify({
+							jsonrpc: "2.0",
+							id: mcpRequest.id,
+							result: { resourceTemplates: [] },
+						}),
+						{
+							status: 200,
+							headers: {
+								"Content-Type": "application/json",
+								"Access-Control-Allow-Origin": "*",
+								"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+								"Access-Control-Allow-Headers":
+									"Content-Type, Authorization, Cache-Control, mcp-protocol-version",
+							},
+						},
+					);
+				}
+
 				if (mcpRequest.method === "notifications/initialized") {
 					// Notifications don't need a response
 					return new Response("", {
@@ -924,7 +889,6 @@ export class MerakiMCPAgent extends McpAgent<
 
 				// Handle notifications (no response expected)
 				if (!mcpRequest.id && mcpRequest.method) {
-					console.error(`[DEBUG] Handling notification: ${mcpRequest.method}`);
 					return new Response("", {
 						status: 204,
 						headers: {
@@ -938,7 +902,6 @@ export class MerakiMCPAgent extends McpAgent<
 
 				// Handle other notifications that might be sent during connection
 				if (mcpRequest.method?.startsWith("notifications/")) {
-					console.error(`[DEBUG] Handling notification: ${mcpRequest.method}`);
 					return new Response("", {
 						status: 204,
 						headers: {
@@ -951,8 +914,6 @@ export class MerakiMCPAgent extends McpAgent<
 				}
 
 				// Default response for unhandled methods
-				console.error(`[DEBUG] Unhandled method: ${mcpRequest.method}`);
-
 				// Only return error for requests (with ID), not notifications
 				if (mcpRequest.id !== undefined) {
 					return new Response(
@@ -987,8 +948,7 @@ export class MerakiMCPAgent extends McpAgent<
 						},
 					});
 				}
-			} catch (error) {
-				console.error(`[ERROR] MCP parsing error:`, error);
+			} catch (_error) {
 				return new Response(
 					JSON.stringify({
 						jsonrpc: "2.0",
@@ -1021,25 +981,15 @@ async function handleMcpRequest(
 	env: Env,
 	_ctx: ExecutionContext,
 ): Promise<Response> {
-	const { pathname } = new URL(req.url);
-	console.error(`[DEBUG] handleMcpRequest: ${req.method} ${pathname}`);
-	console.error(`[DEBUG] handleMcpRequest - env:`, typeof env, !!env);
-	console.error(
-		`[DEBUG] handleMcpRequest - env.MCP_OBJECT:`,
-		typeof env?.MCP_OBJECT,
-		!!env?.MCP_OBJECT,
-	);
-
 	if (!env?.MCP_OBJECT) {
-		console.error(`[ERROR] MCP_OBJECT not available in env`);
 		return new Response("MCP_OBJECT not available", { status: 500 });
 	}
 
 	// Use a consistent ID so we always get the same Durable Object instance
-	const durableObjectId = env.MCP_OBJECT.idFromName("meraki-mcp-agent");
+	// Changed ID to force new instance with updated code (v2)
+	const durableObjectId = env.MCP_OBJECT.idFromName("meraki-mcp-agent-v2");
 	const stub = env.MCP_OBJECT.get(durableObjectId);
 
-	console.error(`[DEBUG] Routing to Durable Object with consistent ID`);
 	return stub.fetch(req);
 }
 
@@ -1050,12 +1000,9 @@ async function mainHandler(
 	ctx: ExecutionContext,
 ): Promise<Response> {
 	const { pathname } = new URL(request.url);
-	console.error(`[DEBUG] mainHandler: ${request.method} ${pathname}`);
-	console.error(`[DEBUG] env.MCP_OBJECT available:`, !!env.MCP_OBJECT);
 
 	// Handle OAuth discovery endpoints
 	if (pathname === "/.well-known/oauth-authorization-server") {
-		console.error(`[DEBUG] OAuth discovery endpoint requested`);
 		const baseUrl = new URL(request.url).origin;
 
 		const discoveryMetadata = {
@@ -1098,8 +1045,6 @@ async function mainHandler(
 	}
 
 	if (pathname === "/.well-known/jwks.json") {
-		console.error(`[DEBUG] JWKS endpoint requested`);
-
 		// Proxy Cloudflare Access JWKS endpoint
 		if (env.ACCESS_JWKS_URL) {
 			try {
@@ -1109,13 +1054,9 @@ async function mainHandler(
 				let jwks = await cache.get(cacheKey);
 
 				if (!jwks) {
-					console.error(`[DEBUG] Fetching JWKS from ${env.ACCESS_JWKS_URL}`);
 					const resp = await fetch(env.ACCESS_JWKS_URL);
 					jwks = await resp.json();
 					await cache.set(cacheKey, jwks, { ttl: CacheTTL.JWKS_KEYS(env) });
-					console.error(`[DEBUG] JWKS cached successfully`);
-				} else {
-					console.error(`[DEBUG] JWKS served from cache`);
 				}
 
 				return new Response(JSON.stringify(jwks, null, 2), {
@@ -1125,15 +1066,12 @@ async function mainHandler(
 						"Cache-Control": "public, max-age=3600, s-maxage=3600",
 					},
 				});
-			} catch (error) {
-				console.error("[ERROR] Failed to fetch JWKS:", error);
+			} catch (_error) {
+				// Fall through to empty JWKS
 			}
 		}
 
 		// Fallback: return empty JWKS if Access not configured
-		console.error(
-			`[DEBUG] ACCESS_JWKS_URL not configured, returning empty JWKS`,
-		);
 		const jwks = { keys: [] };
 		return new Response(JSON.stringify(jwks, null, 2), {
 			headers: {
@@ -1149,7 +1087,6 @@ async function mainHandler(
 		request.method === "OPTIONS" &&
 		(pathname === "/sse" || pathname === "/sse/message" || pathname === "/mcp")
 	) {
-		console.error(`[DEBUG] Handling CORS preflight for ${pathname}`);
 		return new Response(null, {
 			status: 204,
 			headers: {
@@ -1177,16 +1114,8 @@ async function mainHandler(
 				code: "unknown_error",
 				message: "Authentication failed",
 			};
-			console.error(
-				`[AUTH] Authentication failed: ${error.code} - ${error.message}`,
-			);
 			return createUnauthorizedResponse(baseUrl, error);
 		}
-
-		// Log successful authentication
-		console.error(
-			`[AUTH] User authenticated: ${authResult.claims?.email} (${authResult.claims?.sub})`,
-		);
 
 		// Forward to MCP handler
 		return handleMcpRequest(request, env, ctx);

@@ -113,8 +113,7 @@ export function createOAuthHelpers(env: Env): OAuthHelpers {
 					redirectUris: client.redirect_uris,
 					scope: client.scope || "meraki:read",
 				};
-			} catch (error) {
-				console.error("Error looking up client:", clientId, error);
+			} catch (_error) {
 				// Return basic info on error
 				return {
 					clientId,
