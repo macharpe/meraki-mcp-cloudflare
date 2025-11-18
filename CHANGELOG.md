@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **[both]** Code Quality: Removed all debug logging (console.error, console.log, console.warn) from production code
+- **[both]** Performance: Reduced log noise in Cloudflare Workers by removing 113 lines of debug statements
+- **[both]** Maintenance: Cleaned up unused error variables and unused class properties
+
 ## [1.3.2] - 2025-11-17
 
 ### Fixed
